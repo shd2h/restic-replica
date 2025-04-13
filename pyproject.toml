@@ -1,0 +1,15 @@
+[project]
+name = "restic-replica"
+version = "0.1.0"
+description = "python-based cli tool to copy restic snapshots between repositories"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "black>=25.1.0",
+    "pytest>=8.3.5",
+    "pytest-cov>=6.1.1",
+    "ruff>=0.11.5",
+]
