@@ -1,7 +1,7 @@
-from configparser import ConfigParser
 from datetime import datetime
 import logging
 from pathlib import Path
+import tomllib
 
 from restic_replica.repository import (
     Repository,
@@ -19,33 +19,69 @@ from restic_replica.repository import (
 logger = logging.getLogger(__name__)
 
 
-def read_config_file(config_file: Path) -> ConfigParser:
-    config = ConfigParser()
+def read_config_file(config_file: Path) -> dict:
     try:
-        config.read(config_file)
-        return config
+        with open(config_file, "rb") as f:
+            return tomllib.load(f)
     except Exception as err:
-        # TODO: programmatically create config file from defaults if not exist?
         print(f"ERROR: {err}")
         raise
 
 
 def get_local_repository(name: str, config: dict) -> Repository:
-    # TODO: no idea how to handle env vars or password passthrough as those are optional.
-    return LocalRepository(uri=config["repository_uri"], name=name)
+    # non-optional config data
+    uri = config["repository_uri"]
+    # optional config data
+    try:
+        password = config["password"]
+    except KeyError:
+        password = None
+    try:
+        env = config["environment"]
+    except KeyError:
+        env = None
+    return LocalRepository(uri, name, password, env)
 
 
 def get_sftp_repository(name: str, config: dict) -> Repository:
-    return SFTPRepository(uri=config["repository_uri"], name=name)
+    # non-optional config data
+    uri = config["repository_uri"]
+    # optional config data
+    try:
+        password = config["password"]
+    except KeyError:
+        password = None
+    try:
+        env = config["environment"]
+    except KeyError:
+        env = None
+    return SFTPRepository(uri, name, password, env)
 
 
 def get_rest_repository(name: str, config: dict) -> Repository:
-    return RESTRepository(uri=config["repository_uri"], name=name)
+    # non-optional config data
+    uri = config["repository_uri"]
+    # optional config data
+    try:
+        password = config["password"]
+    except KeyError:
+        password = None
+    try:
+        env = config["environment"]
+    except KeyError:
+        env = None
+    return RESTRepository(uri, name, password, env)
 
 
 def get_s3_repository(name: str, config: dict) -> Repository:
+    # non-optional config data
     uri = config["repository_uri"]
-    return S3Repository(uri, name)
+    # optional config data
+    try:
+        env = config["environment"]
+    except KeyError:
+        env = None
+    return S3Repository(uri, name, environment_vars=env)
 
 
 def get_swift_repository() -> Repository:
