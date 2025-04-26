@@ -45,10 +45,7 @@ def get_rest_repository(name: str, config: dict) -> Repository:
 
 def get_s3_repository(name: str, config: dict) -> Repository:
     uri = config["repository_uri"]
-    access_key_id = config["AWS_ACCESS_KEY_ID"]
-    secret_access_key = config["AWS_SECRET_ACCESS_KEY"]
-    session_token = config["AWS_SESSION_TOKEN"]
-    return S3Repository(uri, name, access_key_id, secret_access_key, session_token)
+    return S3Repository(uri, name)
 
 
 def get_swift_repository() -> Repository:

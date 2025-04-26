@@ -89,21 +89,25 @@ class S3Repository(Repository):
         self,
         uri: str,
         name: str,
-        access_key_id: str,
-        secret_access_key: str,
-        session_token: str | None = None,
         password: str | None = None,
         environment_vars: (
             dict | None
         ) = None,  # can't use field as we need to write to it during init.
+        access_key_id: str | None = None,
+        secret_access_key: str | None = None,
+        session_token: str | None = None,
     ):
         # if user did not supply any environment vars, create an empty dictionary.
         if not environment_vars:
             environment_vars = {}
         super().__init__(uri, name, password, environment_vars)
-        self.access_key_id = access_key_id
-        self.secret_access_key = secret_access_key
-        self.session_token = session_token
+        # These three can be supplied as arguments, or as part of environment_vars
+        if access_key_id:
+            self.access_key_id = access_key_id
+        if secret_access_key:
+            self.secret_access_key = secret_access_key
+        if session_token:
+            self.session_token = session_token
 
     @property
     def access_key_id(self) -> str:
