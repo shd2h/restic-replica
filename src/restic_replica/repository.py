@@ -22,6 +22,7 @@ class ResticCli:
             arguments.append("--json")
         # concat env vars
         environment_vars.update(self.restic.environment_vars)
+        # TODO: set env vars.
         # use Popen instead of run to get "live" output
         with subprocess.Popen(
             arguments, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
@@ -158,7 +159,7 @@ class GCSRepository:
 
 
 @dataclass
-class rcloneRepository:
+class RcloneRepository:
 
     def __init__():
         raise NotImplementedError
