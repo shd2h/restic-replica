@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import logging
 from pathlib import Path
 import subprocess
@@ -40,16 +40,13 @@ class Repository:
         uri: str,
         name: str,
         password: str | None = None,
-        environment_vars: (
-            dict | None
-        ) = None,  # can't use field as we need to write to it during init.
+        environment_vars: dict = field(default_factory=dict),
     ):
-        # if user did not supply any environment vars, create an empty dictionary.
-        if not environment_vars:
-            environment_vars = {}
         self.uri = uri
         self.name = name
-        self.password = password
+        self.environment_vars = environment_vars
+        if password:
+            self.password = password
         self.restic_cli = ResticCli()
 
     @property
@@ -64,106 +61,3 @@ class Repository:
         self.restic_cli.execute(
             ["snapshots"], environment_vars=self.environment_vars, json=json
         )
-
-
-@dataclass
-class LocalRepository(Repository):
-    """restic repository local filesystem class"""
-
-
-@dataclass
-class SFTPRepository(Repository):
-    """restic repository sftp class"""
-
-
-@dataclass
-class RESTRepository(Repository):
-    """restic repository sftp class"""
-
-
-@dataclass
-class S3Repository(Repository):
-    """restic repository sftp class"""
-
-    def __init__(
-        self,
-        uri: str,
-        name: str,
-        password: str | None = None,
-        environment_vars: (
-            dict | None
-        ) = None,  # can't use field as we need to write to it during init.
-        access_key_id: str | None = None,
-        secret_access_key: str | None = None,
-        session_token: str | None = None,
-    ):
-        # if user did not supply any environment vars, create an empty dictionary.
-        if not environment_vars:
-            environment_vars = {}
-        super().__init__(uri, name, password, environment_vars)
-        # These three can be supplied as arguments, or as part of environment_vars
-        if access_key_id:
-            self.access_key_id = access_key_id
-        if secret_access_key:
-            self.secret_access_key = secret_access_key
-        if session_token:
-            self.session_token = session_token
-
-    @property
-    def access_key_id(self) -> str:
-        return self.environment_vars["AWS_ACCESS_KEY_ID"]
-
-    @access_key_id.setter
-    def access_key_id(self, value: str) -> None:
-        self.environment_vars["AWS_ACCESS_KEY_ID"] = value
-
-    @property
-    def secret_access_key(self) -> str:
-        return self.environment_vars["AWS_SECRET_ACCESS_KEY"]
-
-    @secret_access_key.setter
-    def secret_access_key(self, value: str) -> None:
-        self.environment_vars["AWS_SECRET_ACCESS_KEY"] = value
-
-    @property
-    def session_token(self) -> str:
-        return self.environment_vars["AWS_SESSION_TOKEN"]
-
-    @session_token.setter
-    def session_token(self, value: str) -> None:
-        self.environment_vars["AWS_SESSION_TOKEN"] = value
-
-
-@dataclass
-class SwiftRepository:
-
-    def __init__():
-        raise NotImplementedError
-
-
-@dataclass
-class B2Repository:
-
-    def __init__():
-        raise NotImplementedError
-
-
-@dataclass
-class AzureRepository:
-
-    def __init__():
-        raise NotImplementedError
-
-
-@dataclass
-class GCSRepository:
-
-    def __init__():
-        raise NotImplementedError
-
-
-@dataclass
-class RcloneRepository:
-
-    def __init__():
-        raise NotImplementedError
