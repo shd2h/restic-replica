@@ -1,6 +1,7 @@
 from datetime import datetime
 import logging
 from pathlib import Path
+from subprocess import CalledProcessError
 import tomllib
 
 from restic_replica.repository import Repository
@@ -33,11 +34,15 @@ def get_repository(name: str, config: dict) -> Repository:
 
 
 def logging_headers(version: str) -> None:
-    logging.info("==============================")
-    logging.info(f"  restic-replica {version}")
-    logging.info("==============================")
-    logging.info(f"Program start @ {datetime.now().strftime("%Y/%m/%d %H:%M:%S%z")}")
+    logger.info("==============================")
+    logger.info(f"  restic-replica {version}")
+    logger.info("==============================")
+    logger.info(f"Program start @ {datetime.now().strftime("%Y/%m/%d %H:%M:%S%z")}")
 
 
-def check_repository_access():
-    pass
+def check_repository_access(repository: Repository):
+    try:
+        repository.snapshots()
+    except CalledProcessError as err:
+        logger.error(err)
+        raise RuntimeError(f"Unable to access restic repository {repository}") from err

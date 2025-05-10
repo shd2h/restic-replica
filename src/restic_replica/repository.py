@@ -4,7 +4,7 @@ import logging
 import os
 from pathlib import Path
 import subprocess
-from typing import Self
+from typing import Optional, Self
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,12 @@ class ResticCli:
             local_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
         ) as process:
             for line in process.stdout:
-                logging.info(line.decode("utf-8").rstrip("\n"))
+                logger.info(line.decode("utf-8").rstrip("\n"))
+            process.wait()  # check for process termination
+        if process.returncode != 0:
+            raise subprocess.CalledProcessError(
+                process.returncode, " ".join(local_args), line
+            )
 
 
 @dataclass
@@ -47,7 +52,7 @@ class Repository:
         self,
         uri: str,
         name: str,
-        password: str | None = None,
+        password: Optional[str] = None,
         environment_vars: dict = field(default_factory=dict),
     ):
         self.uri = uri
@@ -64,6 +69,9 @@ class Repository:
     @password.setter
     def password(self, value: str) -> None:
         self.environment_vars["RESTIC_PASSWORD"] = value
+
+    def __str__(self):
+        return self.uri
 
     def _common_args(self):
         return ["-r", f"{self.uri}"]
