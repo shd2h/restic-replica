@@ -1,7 +1,9 @@
 from dataclasses import dataclass, field
 import logging
+import os
 from pathlib import Path
 import subprocess
+from typing import Self
 
 logger = logging.getLogger(__name__)
 
@@ -16,13 +18,15 @@ class ResticCli:
 
     def execute(self, arguments: list, environment_vars={}, json=False):
         # add restic binary to args
-        arguments.insert(str(self.binary), 0)
+        arguments.insert(0, str(self.binary))
         # add json flag
         if json:
             arguments.append("--json")
         # concat env vars
-        environment_vars.update(self.restic.environment_vars)
-        # TODO: set env vars.
+        environment_vars.update(self.environment_vars)
+        # set env vars
+        for key, value in environment_vars.items():
+            os.environ[f"{key}"] = f"{value}"
         # use Popen instead of run to get "live" output
         with subprocess.Popen(
             arguments, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
@@ -57,7 +61,17 @@ class Repository:
     def password(self, value: str) -> None:
         self.environment_vars["RESTIC_PASSWORD"] = value
 
+    def _common_args(self):
+        return ["-r", f"{self.uri}"]
+
     def snapshots(self, json=False):
-        self.restic_cli.execute(
-            ["snapshots"], environment_vars=self.environment_vars, json=json
-        )
+        args = self._common_args()
+        args.extend(["snapshots"])
+        self.restic_cli.execute(args, environment_vars=self.environment_vars, json=json)
+
+    def copy(self, other: Self, json=False):
+        """copy snapshots from other to self"""
+        if other.password:
+            self.environment_vars["RESTIC_FROM_PASSWORD"] = other.password
+        args = self._common_args().extend(["copy", "--from-repository", other.uri])
+        self.restic_cli.execute(args, environment_vars=self.environment_vars, json=json)

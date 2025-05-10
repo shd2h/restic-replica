@@ -2,11 +2,12 @@ from datetime import datetime
 import logging
 from pathlib import Path
 import sys
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 
-def setup_logging(logdir: Path) -> None:
+def setup_logging(logdir: Optional[Path] = None) -> None:
     if not logdir:
         logdir = Path("~/.restic-replica/")
     timestamp = datetime.now().isoformat(timespec="seconds")
@@ -16,7 +17,7 @@ def setup_logging(logdir: Path) -> None:
     logging.basicConfig(
         level=logging.INFO,
         handlers=[
-            logging.FileHandler("{0}/{1}".format(logdir, logname)),
+            # logging.FileHandler("{0}/{1}".format(logdir, logname)),
             logging.StreamHandler(sys.stdout),
         ],
     )
