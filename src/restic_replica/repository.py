@@ -35,8 +35,20 @@ class ResticCli:
         with subprocess.Popen(
             local_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
         ) as process:
-            for line in process.stdout:
-                logger.info(line.decode("utf-8").rstrip("\n"))
+            for line_raw in process.stdout:
+                line = line_raw.decode("utf-8").rstrip("\n")
+                if line is not None:
+                    match line[0:5]:
+                        case "Fatal":
+                            logger.critical(line)
+                        case "Error":
+                            logger.error(line)
+                        case "Warni":
+                            logger.warning(line)
+                        case "Debug":
+                            logger.debug(line)
+                        case _:
+                            logger.info(line)
             process.wait()  # check for process termination
         if process.returncode != 0:
             raise subprocess.CalledProcessError(
