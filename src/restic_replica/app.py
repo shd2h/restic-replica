@@ -30,7 +30,7 @@ def get_repository(name: str, config: dict) -> Repository:
     except KeyError:
         password_file = None
     try:
-        password_command = config["password-command"]
+        password_command = config["password_command"]
     except KeyError:
         password_command = None
     try:

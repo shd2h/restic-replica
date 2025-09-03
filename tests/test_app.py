@@ -3,9 +3,11 @@ import textwrap
 import tomllib
 
 from restic_replica import app
+from restic_replica.repository import Repository
 
 
 class TestReadConfigFile:
+    """Tests for the function app.read_config_file"""
 
     def test_valid_toml(self, tmp_path):
         """Valid toml should load into a dictionary correctly"""
@@ -49,3 +51,48 @@ class TestReadConfigFile:
         f = tmp_path / "notarealfile.toml"
         with pytest.raises(FileNotFoundError):
             app.read_config_file(f)
+
+
+class TestGetRepository:
+    """Tests for the function app.get_repository"""
+
+    def test_password(self):
+        """A supplied password should be included in the instanced repository"""
+        config = {"repository_uri": "/tmp/restic-repo", "password": "secret"}
+        assert app.get_repository("myrepo", config) == Repository(
+            "/tmp/restic-repo", "myrepo", password="secret"
+        )
+
+    def test_password_file(self):
+        """A supplied password_file should be included in the instanced repository"""
+        config = {
+            "repository_uri": "/tmp/restic-repo",
+            "password_file": "/path/to/secret",
+        }
+        assert app.get_repository("myrepo", config) == Repository(
+            "/tmp/restic-repo", "myrepo", password_file="/path/to/secret"
+        )
+
+    def test_password_command(self):
+        """A supplied password_command should be included in the instanced repository"""
+        config = {
+            "repository_uri": "/tmp/restic-repo",
+            "password_command": "/bin/getsecret myrepo",
+        }
+        assert app.get_repository("myrepo", config) == Repository(
+            "/tmp/restic-repo", "myrepo", password_command="/bin/getsecret myrepo"
+        )
+
+    def test_environment_variables(self):
+        """Any supplied environment variables should be included in the instanced repository"""
+        config = {
+            "repository_uri": "/tmp/restic-repo",
+            "password": "secret",
+            "environment": {"RESTIC_COMPRESSION": "true"},
+        }
+        assert app.get_repository("myrepo", config) == Repository(
+            "/tmp/restic-repo",
+            "myrepo",
+            password="secret",
+            environment_vars={"RESTIC_COMPRESSION": "true"},
+        )
