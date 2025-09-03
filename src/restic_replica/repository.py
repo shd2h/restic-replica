@@ -170,5 +170,5 @@ class Repository:
                 other.password_command
             )
         args = self._common_args()
-        args.extend(["copy", "--from-repository", other.uri])
+        args.extend(["copy", "--from-repo", other.uri])
         self.restic_cli.execute(args, environment_vars=self.environment_vars, json=json)
