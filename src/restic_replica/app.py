@@ -1,4 +1,3 @@
-from datetime import datetime
 import logging
 from pathlib import Path
 from subprocess import CalledProcessError
@@ -14,7 +13,7 @@ def read_config_file(config_file: Path) -> dict:
         with open(config_file, "rb") as f:
             return tomllib.load(f)
     except Exception as err:
-        print(f"ERROR: {err}")
+        logger.error(err)
         raise
 
 
@@ -27,20 +26,28 @@ def get_repository(name: str, config: dict) -> Repository:
     except KeyError:
         password = None
     try:
+        password_file = config["password_file"]
+    except KeyError:
+        password_file = None
+    try:
+        password_command = config["password-command"]
+    except KeyError:
+        password_command = None
+    try:
         env = config["environment"]
     except KeyError:
         env = None
-    return Repository(uri, name, password, env)
+    return Repository(
+        uri,
+        name,
+        password=password,
+        password_file=password_file,
+        password_command=password_command,
+        environment_vars=env,
+    )
 
 
-def logging_headers(version: str) -> None:
-    logger.info("==============================")
-    logger.info(f"  restic-replica {version}")
-    logger.info("==============================")
-    logger.info(f"Program start @ {datetime.now().strftime("%Y/%m/%d %H:%M:%S%z")}")
-
-
-def check_repository_access(repository: Repository):
+def check_repository_access(repository: Repository) -> None:
     try:
         repository.snapshots()
     except CalledProcessError as err:

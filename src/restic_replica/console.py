@@ -21,3 +21,10 @@ def setup_logging(logdir: Optional[Path] = None) -> None:
             logging.StreamHandler(sys.stdout),
         ],
     )
+
+
+def logging_headers(version: str) -> None:
+    logger.info("==============================")
+    logger.info(f"  restic-replica {version}")
+    logger.info("==============================")
+    logger.info(f"Program start @ {datetime.now().strftime("%Y/%m/%d %H:%M:%S%z")}")
