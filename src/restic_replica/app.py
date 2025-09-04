@@ -47,9 +47,9 @@ def get_repository(name: str, config: dict) -> Repository:
     )
 
 
-def check_repository_access(repository: Repository) -> None:
+def check_repository_access(repository: Repository) -> bool:
     try:
-        repository.snapshots()
+        return repository.snapshots()
     except CalledProcessError as err:
         logger.error(err)
         raise RuntimeError(f"Unable to access restic repository {repository}") from err
@@ -57,7 +57,7 @@ def check_repository_access(repository: Repository) -> None:
 
 def copy_snapshots(source_repository: Repository, target_repository: Repository):
     try:
-        target_repository.copy(source_repository)
+        return target_repository.copy(source_repository)
     except CalledProcessError as err:
         logger.error(err)
         raise RuntimeError(

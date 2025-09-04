@@ -17,7 +17,8 @@ class ResticCli:
     binary: Path = Path("/usr/local/bin/restic")
     environment_vars = {"RESTIC_PROGRESS_FPS": "0.003333"}
 
-    def execute(self, arguments: list, environment_vars={}, json=False):
+    # TODO: implement json/non-live output
+    def execute(self, arguments: list, environment_vars={}, json=False) -> int:
         # ensure no mutation of mutable arguments
         local_args = deepcopy(arguments)
         local_env_vars = deepcopy(environment_vars)
@@ -54,6 +55,8 @@ class ResticCli:
             raise subprocess.CalledProcessError(
                 process.returncode, " ".join(local_args), line
             )
+        else:
+            return process.stdout
 
 
 @dataclass
@@ -130,7 +133,7 @@ class Repository:
     def _common_args(self):
         return ["-r", f"{self.uri}"]
 
-    def _verify_password_is_set(self) -> None:
+    def _verify_password_is_set(self) -> bool:
         """Assert that the password options supplied are valid"""
         # Attempt to mimic restics behaviour here, in that:
         # - password_file or password_command overwrite password
@@ -153,22 +156,38 @@ class Repository:
             logger.warning(
                 f"password and password_command were specified for repository {self.uri}; password_command will be used"
             )
+        return True
 
-    def snapshots(self, json=False):
+    # TODO: implement json/non-live output
+    def snapshots(self, json=False) -> bool:
+        """list the snapshots stored in this repository"""
+
+        # execute restic CLI with the snapshots argument
         args = self._common_args()
         args.extend(["snapshots"])
-        self.restic_cli.execute(args, environment_vars=self.environment_vars, json=json)
+        rc = self.restic_cli.execute(
+            args, environment_vars=self.environment_vars, json=json
+        )
+        return rc == 0
 
-    def copy(self, other: Self, json=False):
-        """copy snapshots from other to self"""
-        if other.password:
-            self.environment_vars["RESTIC_FROM_PASSWORD"] = other.password
-        if other.password_file:
-            self.environment_vars["RESTIC_FROM_PASSWORD_FILE"] = other.password_file
+    # TODO: implement json/non-live output
+    def copy(self, other: Self, json=False) -> bool:
+        """copy snapshots from other repository to this repository"""
+
+        # Set environment variables based on the password configuration of the other repository, in descending order of primacy
         if other.password_command:
             self.environment_vars["RESTIC_FROM_PASSWORD_COMMAND"] = (
                 other.password_command
             )
+        elif other.password_file:
+            self.environment_vars["RESTIC_FROM_PASSWORD_FILE"] = other.password_file
+        else:  # if neither a password command or password file were supplied, use password.
+            self.environment_vars["RESTIC_FROM_PASSWORD"] = other.password
+
+        # execute restic CLI with the copy and other repository argument
         args = self._common_args()
         args.extend(["copy", "--from-repo", other.uri])
-        self.restic_cli.execute(args, environment_vars=self.environment_vars, json=json)
+        rc = self.restic_cli.execute(
+            args, environment_vars=self.environment_vars, json=json
+        )
+        return rc == 0

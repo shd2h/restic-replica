@@ -1,6 +1,8 @@
 import pytest
+from subprocess import CalledProcessError
 import textwrap
 import tomllib
+from unittest import mock
 
 from restic_replica import app
 from restic_replica.repository import Repository
@@ -96,3 +98,22 @@ class TestGetRepository:
             password="secret",
             environment_vars={"RESTIC_COMPRESSION": "true"},
         )
+
+
+class TestCheckRepositoryAccess:
+    """Tests for the function app.check_repository_access"""
+
+    @pytest.mark.usefixtures("repository_fixture")
+    def test_valid_repository(self, repository_fixture):
+        with mock.patch.object(repository_fixture, "snapshots", return_value=True):
+            assert app.check_repository_access(repository_fixture)
+
+    @pytest.mark.usefixtures("repository_fixture")
+    def test_invalid_repository(self, repository_fixture):
+        with mock.patch.object(
+            repository_fixture,
+            "snapshots",
+            side_effect=CalledProcessError(1, "notalrealcommand"),
+        ):
+            with pytest.raises(RuntimeError):
+                app.check_repository_access(repository_fixture)
