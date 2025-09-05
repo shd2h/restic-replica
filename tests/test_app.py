@@ -117,3 +117,28 @@ class TestCheckRepositoryAccess:
         ):
             with pytest.raises(RuntimeError):
                 app.check_repository_access(repository_fixture)
+
+
+class TestCopySnapshots:
+    """Tests for the function app.copy_snapshots"""
+
+    @pytest.mark.usefixtures("repository_fixture")
+    def test_copy_success(self, repository_fixture):
+        with mock.patch.object(repository_fixture, "copy", return_value=True):
+            assert app.copy_snapshots(
+                Repository("/tmp/restic-repo2", "myrepo2", password="secret2"),
+                repository_fixture,
+            )
+
+    @pytest.mark.usefixtures("repository_fixture")
+    def test_copy_fail(self, repository_fixture):
+        with mock.patch.object(
+            repository_fixture,
+            "copy",
+            side_effect=CalledProcessError(1, "notalrealcommand"),
+        ):
+            with pytest.raises(RuntimeError):
+                app.copy_snapshots(
+                    repository_fixture,
+                    Repository("/tmp/restic-repo2", "myrepo2", password="secret2"),
+                )
