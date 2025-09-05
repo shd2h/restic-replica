@@ -174,6 +174,10 @@ class Repository:
     def copy(self, other: Self, json=False) -> bool:
         """copy snapshots from other repository to this repository"""
 
+        # prevent copying to/from the same repository
+        if other.uri == self.uri:
+            raise RuntimeError("source and destination repository must be different")
+
         # Set environment variables based on the password configuration of the other repository, in descending order of primacy
         if other.password_command:
             self.environment_vars["RESTIC_FROM_PASSWORD_COMMAND"] = (
