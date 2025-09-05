@@ -105,11 +105,13 @@ class TestCheckRepositoryAccess:
 
     @pytest.mark.usefixtures("repository_fixture")
     def test_valid_repository(self, repository_fixture):
+        """Should return True in the event of successful access check"""
         with mock.patch.object(repository_fixture, "snapshots", return_value=True):
             assert app.check_repository_access(repository_fixture)
 
     @pytest.mark.usefixtures("repository_fixture")
     def test_invalid_repository(self, repository_fixture):
+        """Should raise a RuntimeError if the repository is unable to be accessed"""
         with mock.patch.object(
             repository_fixture,
             "snapshots",
@@ -124,6 +126,7 @@ class TestCopySnapshots:
 
     @pytest.mark.usefixtures("repository_fixture")
     def test_copy_success(self, repository_fixture):
+        """Should return true if the copy operation is successful"""
         with mock.patch.object(repository_fixture, "copy", return_value=True):
             assert app.copy_snapshots(
                 Repository("/tmp/restic-repo2", "myrepo2", password="secret2"),
@@ -132,6 +135,7 @@ class TestCopySnapshots:
 
     @pytest.mark.usefixtures("repository_fixture")
     def test_copy_fail(self, repository_fixture):
+        """Should raise RuntimeError if the copy operation fails"""
         with mock.patch.object(
             repository_fixture,
             "copy",
