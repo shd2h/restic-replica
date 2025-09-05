@@ -1,7 +1,6 @@
 from datetime import datetime
 import logging
 from pathlib import Path
-import sys
 from typing import Optional
 
 logger = logging.getLogger(__name__)
