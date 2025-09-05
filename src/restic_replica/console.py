@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 def setup_logging(logdir: Optional[Path] = None) -> None:
     if not logdir:
-        logdir = Path("~/.restic-replica/")
+        logdir = Path.home() / ".restic-replica"
     timestamp = datetime.now().isoformat(timespec="seconds")
     logname = f"restic-replica_{timestamp}.log"
     # create logging dir
