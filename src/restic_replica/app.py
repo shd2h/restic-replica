@@ -55,11 +55,11 @@ def check_repository_access(repository: Repository) -> bool:
         raise RuntimeError(f"Unable to access restic repository {repository}") from err
 
 
-def copy_snapshots(source_repository: Repository, target_repository: Repository):
+def copy_snapshots(source_repository: Repository, destination_repository: Repository):
     try:
-        return target_repository.copy(source_repository)
+        return destination_repository.copy(source_repository)
     except CalledProcessError as err:
         logger.error(err)
         raise RuntimeError(
-            "error copying snapshots from {source_repository} to {target_repository}"
+            "error copying snapshots from {source_repository} to {destination_repository}"
         ) from err
