@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from subprocess import CalledProcessError
+from subprocess import CalledProcessError, CompletedProcess
 import tomllib
 
 from restic_replica.repository import Repository
@@ -49,13 +49,15 @@ def get_repository(name: str, config: dict) -> Repository:
 
 def check_repository_access(repository: Repository) -> bool:
     try:
-        return repository.snapshots()
+        return bool(repository.snapshots())
     except CalledProcessError as err:
         logger.error(err)
         raise RuntimeError(f"Unable to access restic repository {repository}") from err
 
 
-def copy_snapshots(source_repository: Repository, destination_repository: Repository):
+def copy_snapshots(
+    source_repository: Repository, destination_repository: Repository
+) -> CompletedProcess:
     try:
         return destination_repository.copy(source_repository)
     except CalledProcessError as err:

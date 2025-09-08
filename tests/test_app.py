@@ -1,5 +1,5 @@
 import pytest
-from subprocess import CalledProcessError
+from subprocess import CalledProcessError, CompletedProcess
 import textwrap
 import tomllib
 from unittest import mock
@@ -106,7 +106,9 @@ class TestCheckRepositoryAccess:
     @pytest.mark.usefixtures("repository_fixture")
     def test_valid_repository(self, repository_fixture):
         """Should return True in the event of successful access check"""
-        with mock.patch.object(repository_fixture, "snapshots", return_value=True):
+        with mock.patch.object(
+            repository_fixture, "snapshots", return_value=CompletedProcess(["./foo"], 0)
+        ):
             assert app.check_repository_access(repository_fixture)
 
     @pytest.mark.usefixtures("repository_fixture")
@@ -127,10 +129,15 @@ class TestCopySnapshots:
     @pytest.mark.usefixtures("repository_fixture")
     def test_copy_success(self, repository_fixture):
         """Should return true if the copy operation is successful"""
-        with mock.patch.object(repository_fixture, "copy", return_value=True):
-            assert app.copy_snapshots(
-                Repository("/tmp/restic-repo2", "myrepo2", password="secret2"),
-                repository_fixture,
+        with mock.patch.object(
+            repository_fixture, "copy", return_value=CompletedProcess(["./foo"], 0)
+        ):
+            assert isinstance(
+                app.copy_snapshots(
+                    Repository("/tmp/restic-repo2", "myrepo2", password="secret2"),
+                    repository_fixture,
+                ),
+                CompletedProcess,
             )
 
     @pytest.mark.usefixtures("repository_fixture")
