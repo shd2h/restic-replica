@@ -26,23 +26,22 @@ class ResticCli:
         """Execute the command "arguments" and write stdout/stderr from the command to logger."""
         # use Popen instead of run to get "live" output
         with subprocess.Popen(
-            arguments, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+            arguments,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            encoding="UTF-8",
+            text=True,
         ) as process:
             line = None
-            for line_raw in process.stdout:
-                line = line_raw.decode("utf-8").rstrip("\n")
+            for line in process.stdout:
                 if line is not None:
                     match line[0:5]:
                         case "Fatal":
-                            logger.critical(line)
-                        case "Error":
-                            logger.error(line)
+                            logger.error(line.rstrip("\n"))
                         case "Warni":
-                            logger.warning(line)
-                        case "Debug":
-                            logger.debug(line)
+                            logger.warning(line.rstrip("\n"))
                         case _:
-                            logger.info(line)
+                            logger.info(line.rstrip("\n"))
             process.wait()  # check for process termination
         # NB: restic returns code 3 if unable to read some source data during backup; this is only a partial failure.
         if process.returncode not in [0, 3]:
@@ -83,7 +82,7 @@ class ResticCli:
         # ensure no mutation of mutable arguments
         local_args = copy.copy(arguments)
         local_env_vars = copy.copy(environment_vars)
-        # add our environment variables to command
+        # add our environment variables to command, *overwriting duplicates*
         local_env_vars.update(self.environment_vars)
         # prepend restic binary path to args
         local_args.insert(0, str(self.path))
@@ -130,7 +129,7 @@ class Repository:
             self.password_file = password_file
         if password_command is not None:
             self.password_command = password_command
-        # TODO: support for "--insecure-no-password" to be added here.
+        # TODO: support for "--insecure-no-password" to be added here, also rclone.
         # validate a password has been supplied for the repository
         self._verify_password_is_set()
 
