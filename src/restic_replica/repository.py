@@ -1,4 +1,4 @@
-from copy import deepcopy
+import copy
 from dataclasses import dataclass
 import logging
 import os
@@ -17,25 +17,13 @@ class ResticCli:
     binary: Path = Path("/usr/local/bin/restic")
     environment_vars = {"RESTIC_PROGRESS_FPS": "0.003333"}
 
-    # TODO: implement json/non-live output
-    def execute(self, arguments: list, environment_vars={}, json=False) -> int:
-        # ensure no mutation of mutable arguments
-        local_args = deepcopy(arguments)
-        local_env_vars = deepcopy(environment_vars)
-        # add our environment variables to command
-        local_env_vars.update(self.environment_vars)
-        # prepend restic binary path to args
-        local_args.insert(0, str(self.binary))
-        # optionally add json flag
-        if json:
-            local_args.append("--json")
-        # set environment variables
-        for key, value in local_env_vars.items():
-            os.environ[f"{key}"] = f"{value}"
+    def _execute_live_output(self, arguments: list[str]) -> subprocess.CompletedProcess:
+        """Execute the command "arguments" and write stdout/stderr from the command to logger."""
         # use Popen instead of run to get "live" output
         with subprocess.Popen(
-            local_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+            arguments, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
         ) as process:
+            line = None
             for line_raw in process.stdout:
                 line = line_raw.decode("utf-8").rstrip("\n")
                 if line is not None:
@@ -51,12 +39,62 @@ class ResticCli:
                         case _:
                             logger.info(line)
             process.wait()  # check for process termination
-        if process.returncode != 0:
+        # NB: restic returns code 3 if unable to read some source data during backup; this is only a partial failure.
+        if process.returncode not in [0, 3]:
             raise subprocess.CalledProcessError(
-                process.returncode, " ".join(local_args), line
+                process.returncode, arguments, None, line
             )
         else:
-            return process.stdout
+            return subprocess.CompletedProcess(
+                arguments, process.returncode, None, None
+            )
+
+    def execute(
+        self,
+        arguments: list[str],
+        environment_vars: dict[
+            str, str
+        ] = {},  # NB: do not need to set to None, as the default value is only ever copied, never modified directly.
+        live_output: bool = False,
+        json: bool = False,
+    ) -> subprocess.CompletedProcess:
+        """
+        Run the restic process with the provided commandline arguments.
+        - If live_output, restic will write stdout/stderr to logger while the restic
+        process is running.
+        - If not live_output, stdout/stderr are captured and returned in a
+        CompletedProcess instance after the restic process exits.
+
+        Args:
+            arguments: the commandline arguments to be passed to restic.
+            environment_vars: environment variables to pass to restic.
+            live_output: whether to write output to `logger` as it is emitted by restic,
+                or whether to capture output and return it after the restic process exits.
+            json: whether restic should emit output in json format.
+
+        Returns:
+           subprocess.CompletedProcess: the completed restic process
+        """
+        # ensure no mutation of mutable arguments
+        local_args = copy.copy(arguments)
+        local_env_vars = copy.copy(environment_vars)
+        # add our environment variables to command
+        local_env_vars.update(self.environment_vars)
+        # prepend restic binary path to args
+        local_args.insert(0, str(self.binary))
+        # optionally add json flag
+        if json:
+            local_args.append("--json")
+        # set environment variables
+        for key, value in local_env_vars.items():
+            os.environ[f"{key}"] = f"{value}"
+
+        if live_output:
+            return self._execute_live_output(local_args)
+        else:
+            return subprocess.run(
+                local_args, capture_output=True, check=True, encoding="UTF-8", text=True
+            )
 
 
 @dataclass
@@ -70,7 +108,7 @@ class Repository:
         password: Optional[str] = None,
         password_file: Optional[Union[str | Path]] = None,
         password_command: Optional[str] = None,
-        environment_vars: dict = None,
+        environment_vars: Optional[dict] = None,
     ):
         self.uri = uri
         self.name = name
@@ -158,20 +196,24 @@ class Repository:
             )
         return True
 
-    # TODO: implement json/non-live output
-    def snapshots(self, json=False) -> bool:
+    def snapshots(
+        self, live_output: bool = False, json: bool = False
+    ) -> subprocess.CompletedProcess:
         """list the snapshots stored in this repository"""
 
         # execute restic CLI with the snapshots argument
         args = self._common_args()
         args.extend(["snapshots"])
-        rc = self.restic_cli.execute(
-            args, environment_vars=self.environment_vars, json=json
+        return self.restic_cli.execute(
+            args,
+            environment_vars=self.environment_vars,
+            live_output=live_output,
+            json=json,
         )
-        return rc == 0
 
-    # TODO: implement json/non-live output
-    def copy(self, other: Self, json=False) -> bool:
+    def copy(
+        self, other: Self, live_output: bool = False, json: bool = False
+    ) -> subprocess.CompletedProcess:
         """copy snapshots from other repository to this repository"""
 
         # prevent copying to/from the same repository
@@ -191,7 +233,9 @@ class Repository:
         # execute restic CLI with the copy and other repository argument
         args = self._common_args()
         args.extend(["copy", "--from-repo", other.uri])
-        rc = self.restic_cli.execute(
-            args, environment_vars=self.environment_vars, json=json
+        return self.restic_cli.execute(
+            args,
+            environment_vars=self.environment_vars,
+            live_output=live_output,
+            json=json,
         )
-        return rc == 0
