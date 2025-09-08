@@ -1,3 +1,4 @@
+from pathlib import Path
 import pytest
 from subprocess import CalledProcessError, CompletedProcess
 import textwrap
@@ -5,7 +6,7 @@ import tomllib
 from unittest import mock
 
 from restic_replica import app
-from restic_replica.repository import Repository
+from restic_replica.repository import Repository, ResticCli
 
 
 class TestReadConfigFile:
@@ -55,46 +56,87 @@ class TestReadConfigFile:
             app.read_config_file(f)
 
 
+class TestGetRestic:
+    """Tests for the function app.get_restic"""
+
+    def test_defaults_nonwin(self):
+        """Default configuration for not-windows should be set if no arguments are supplied"""
+        with mock.patch("platform.system", return_value="Linux"):
+            assert app.get_restic({}) == ResticCli(
+                Path("restic"), {"RESTIC_PROGRESS_FPS": "0.016667"}
+            )
+
+    def test_defaults_win(self):
+        """Default configuration for windows should be set if no arguments are supplied"""
+        with mock.patch("platform.system", return_value="Windows"):
+            assert app.get_restic({}) == ResticCli(
+                Path("restic.exe"), {"RESTIC_PROGRESS_FPS": "0.016667"}
+            )
+
+    def test_path(self):
+        """A supplied restic path should be included in the returned class instance"""
+        config = {"path": "/usr/local/bin/restic"}
+        assert app.get_restic(config).path == Path("/usr/local/bin/restic")
+
+    def test_progress_fps(self):
+        """A supplied value for RESTIC_PROGRESS_FPS should be included in the returned class instance"""
+        config = {"environment": {"RESTIC_PROGRESS_FPS": "0.003333"}}
+        assert app.get_restic(config).environment_vars == {
+            "RESTIC_PROGRESS_FPS": "0.003333"
+        }
+
+
 class TestGetRepository:
     """Tests for the function app.get_repository"""
 
-    def test_password(self):
+    @pytest.mark.usefixtures("restic_cli_fixture")
+    def test_password(self, restic_cli_fixture):
         """A supplied password should be included in the instanced repository"""
         config = {"repository_uri": "/tmp/restic-repo", "password": "secret"}
-        assert app.get_repository("myrepo", config) == Repository(
-            "/tmp/restic-repo", "myrepo", password="secret"
+        assert app.get_repository("myrepo", config, restic_cli_fixture) == Repository(
+            "/tmp/restic-repo", "myrepo", restic_cli_fixture, password="secret"
         )
 
-    def test_password_file(self):
+    @pytest.mark.usefixtures("restic_cli_fixture")
+    def test_password_file(self, restic_cli_fixture):
         """A supplied password_file should be included in the instanced repository"""
         config = {
             "repository_uri": "/tmp/restic-repo",
             "password_file": "/path/to/secret",
         }
-        assert app.get_repository("myrepo", config) == Repository(
-            "/tmp/restic-repo", "myrepo", password_file="/path/to/secret"
+        assert app.get_repository("myrepo", config, restic_cli_fixture) == Repository(
+            "/tmp/restic-repo",
+            "myrepo",
+            restic_cli_fixture,
+            password_file="/path/to/secret",
         )
 
-    def test_password_command(self):
+    @pytest.mark.usefixtures("restic_cli_fixture")
+    def test_password_command(self, restic_cli_fixture):
         """A supplied password_command should be included in the instanced repository"""
         config = {
             "repository_uri": "/tmp/restic-repo",
             "password_command": "/bin/getsecret myrepo",
         }
-        assert app.get_repository("myrepo", config) == Repository(
-            "/tmp/restic-repo", "myrepo", password_command="/bin/getsecret myrepo"
+        assert app.get_repository("myrepo", config, restic_cli_fixture) == Repository(
+            "/tmp/restic-repo",
+            "myrepo",
+            restic_cli_fixture,
+            password_command="/bin/getsecret myrepo",
         )
 
-    def test_environment_variables(self):
+    @pytest.mark.usefixtures("restic_cli_fixture")
+    def test_environment_variables(self, restic_cli_fixture):
         """Any supplied environment variables should be included in the instanced repository"""
         config = {
             "repository_uri": "/tmp/restic-repo",
             "password": "secret",
             "environment": {"RESTIC_COMPRESSION": "true"},
         }
-        assert app.get_repository("myrepo", config) == Repository(
+        assert app.get_repository("myrepo", config, restic_cli_fixture) == Repository(
             "/tmp/restic-repo",
             "myrepo",
+            restic_cli_fixture,
             password="secret",
             environment_vars={"RESTIC_COMPRESSION": "true"},
         )
@@ -126,22 +168,27 @@ class TestCheckRepositoryAccess:
 class TestCopySnapshots:
     """Tests for the function app.copy_snapshots"""
 
-    @pytest.mark.usefixtures("repository_fixture")
-    def test_copy_success(self, repository_fixture):
+    @pytest.mark.usefixtures("repository_fixture", "restic_cli_fixture")
+    def test_copy_success(self, repository_fixture, restic_cli_fixture):
         """Should return true if the copy operation is successful"""
         with mock.patch.object(
             repository_fixture, "copy", return_value=CompletedProcess(["./foo"], 0)
         ):
             assert isinstance(
                 app.copy_snapshots(
-                    Repository("/tmp/restic-repo2", "myrepo2", password="secret2"),
+                    Repository(
+                        "/tmp/restic-repo2",
+                        "myrepo2",
+                        restic_cli_fixture,
+                        password="secret2",
+                    ),
                     repository_fixture,
                 ),
                 CompletedProcess,
             )
 
-    @pytest.mark.usefixtures("repository_fixture")
-    def test_copy_fail(self, repository_fixture):
+    @pytest.mark.usefixtures("repository_fixture", "restic_cli_fixture")
+    def test_copy_fail(self, repository_fixture, restic_cli_fixture):
         """Should raise RuntimeError if the copy operation fails"""
         with mock.patch.object(
             repository_fixture,
@@ -151,5 +198,10 @@ class TestCopySnapshots:
             with pytest.raises(RuntimeError):
                 app.copy_snapshots(
                     repository_fixture,
-                    Repository("/tmp/restic-repo2", "myrepo2", password="secret2"),
+                    Repository(
+                        "/tmp/restic-repo2",
+                        "myrepo2",
+                        restic_cli_fixture,
+                        password="secret2",
+                    ),
                 )

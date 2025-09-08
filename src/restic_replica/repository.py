@@ -11,11 +11,16 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ResticCli:
-    """restic binary"""
+    """
+    The restic program interface
 
-    # TODO: need to get these from the config file.
-    binary: Path = Path("/usr/local/bin/restic")
-    environment_vars = {"RESTIC_PROGRESS_FPS": "0.003333"}
+    Args:
+        path: path to the restic binary
+        environment_vars: dictionary of environment variables
+    """
+
+    path: Path
+    environment_vars: dict[str, str]
 
     def _execute_live_output(self, arguments: list[str]) -> subprocess.CompletedProcess:
         """Execute the command "arguments" and write stdout/stderr from the command to logger."""
@@ -81,7 +86,7 @@ class ResticCli:
         # add our environment variables to command
         local_env_vars.update(self.environment_vars)
         # prepend restic binary path to args
-        local_args.insert(0, str(self.binary))
+        local_args.insert(0, str(self.path))
         # optionally add json flag
         if json:
             local_args.append("--json")
@@ -105,6 +110,7 @@ class Repository:
         self,
         uri: str,
         name: str,
+        restic_cli: ResticCli,
         password: Optional[str] = None,
         password_file: Optional[Union[str | Path]] = None,
         password_command: Optional[str] = None,
@@ -112,6 +118,7 @@ class Repository:
     ):
         self.uri = uri
         self.name = name
+        self.restic_cli = restic_cli
         if environment_vars is None:
             self.environment_vars = {}
         else:
@@ -126,7 +133,6 @@ class Repository:
         # TODO: support for "--insecure-no-password" to be added here.
         # validate a password has been supplied for the repository
         self._verify_password_is_set()
-        self.restic_cli = ResticCli()
 
     @property
     def password(self) -> Optional[str]:
