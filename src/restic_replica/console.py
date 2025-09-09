@@ -6,6 +6,9 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 
+# TODO: handle tilde
+# TODO: decide about formatting
+# TODO: write into appdata for windows.
 def setup_logging(
     logger: logging.Logger = logging.getLogger("restic_replica"),
     logdir: Optional[Path] = Path.home() / ".restic-replica",

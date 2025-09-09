@@ -30,12 +30,12 @@ def ensure_config_file(config_file: Optional[Path] = None) -> Path:
         config_file = Path.home() / ".restic-replica" / "config.toml"
     # create config file and parent dir if config file does not exist
     if not config_file.exists():
-        logger.info("Missing configuration file")
+        print("ERROR: Missing configuration file")
         config_file.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(
             Path("src/restic_replica/__assets__/example_config.toml"), config_file
         )
-        logger.info(
+        print(
             f"An example configuration file has been created at {config_file}. Update the configuration in this file to match your system, and then re-run this program."
         )
         raise SystemExit(0)
@@ -48,7 +48,7 @@ def read_config_file(config_file: Path) -> dict:
         with open(config_file, "rb") as f:
             return tomllib.load(f)
     except Exception as err:
-        logger.error(err)
+        print(f"ERROR: {err}")
         raise
 
 
