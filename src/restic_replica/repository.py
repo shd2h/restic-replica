@@ -33,8 +33,10 @@ class ResticCli:
             text=True,
         ) as process:
             line = None
+            output = ""
             for line in process.stdout:
                 if line is not None:
+                    output = output + line
                     match line[0:5]:
                         case "Fatal":
                             logger.error(line.rstrip("\n"))
@@ -50,7 +52,7 @@ class ResticCli:
             )
         else:
             return subprocess.CompletedProcess(
-                arguments, process.returncode, None, None
+                arguments, process.returncode, output, None
             )
 
     def execute(
