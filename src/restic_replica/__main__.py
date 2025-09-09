@@ -14,9 +14,18 @@ def main():
     destination = app.get_repository("target", config["destination"], restic_cli)
     # check access, then trigger copy
     try:
+        logger.info("Checking access to source repository")
         app.check_repository_access(source)
+        logger.info("Checking access to destination repository")
         app.check_repository_access(destination)
-        app.copy_snapshots(source, destination)
+        logger.info("Starting copy of snapshots from source to destination repository")
+        result = app.copy_snapshots(source, destination)
+        if not result.stdout:
+            logger.info(
+                "All snapshots from the source are already present in the destination repository"
+            )
+        else:
+            logger.info("Finished copying snapshots")
     except RuntimeError as err:
         logger.error(err)
         raise SystemExit(1)
