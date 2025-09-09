@@ -4,7 +4,7 @@ import logging
 import os
 from pathlib import Path
 import subprocess
-from typing import Optional, Self, Union
+from typing import Optional, Self
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +111,7 @@ class Repository:
         name: str,
         restic_cli: ResticCli,
         password: Optional[str] = None,
-        password_file: Optional[Union[str | Path]] = None,
+        password_file: Optional[str] = None,
         password_command: Optional[str] = None,
         environment_vars: Optional[dict] = None,
     ):
@@ -152,12 +152,8 @@ class Repository:
             return None
 
     @password_file.setter
-    def password_file(self, value: Optional[Union[str | Path]]) -> None:
-        # explicitly cast Path to str (this would happen implicitly otherwise)
-        if isinstance(value, Path):
-            self.environment_vars["RESTIC_PASSWORD_FILE"] = str(value)
-        else:
-            self.environment_vars["RESTIC_PASSWORD_FILE"] = value
+    def password_file(self, value: Optional[str]) -> None:
+        self.environment_vars["RESTIC_PASSWORD_FILE"] = value
 
     @property
     def password_command(self) -> Optional[str]:
