@@ -116,9 +116,9 @@ def copy_snapshots(
     source_repository: Repository, destination_repository: Repository
 ) -> CompletedProcess:
     try:
-        return destination_repository.copy(source_repository)
+        return destination_repository.copy(source_repository, live_output=True)
     except CalledProcessError as err:
         logger.error(err)
         raise RuntimeError(
-            "error copying snapshots from {source_repository} to {destination_repository}"
+            f"error copying snapshots from {source_repository.uri} to {destination_repository.uri}"
         ) from err
