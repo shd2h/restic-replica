@@ -1,12 +1,46 @@
 import logging
 from pathlib import Path
 import platform
+import shutil
 from subprocess import CalledProcessError, CompletedProcess
 import tomllib
+from typing import Optional
 
 from restic_replica.repository import Repository, ResticCli
 
 logger = logging.getLogger(__name__)
+
+
+# TODO: write into AppData for windows.
+def ensure_config_file(config_file: Optional[Path] = None) -> Path:
+    """
+    Search for config file in expected location. If one does not exist, create one, then raise SystemExit.
+
+    Args:
+        config_file: path to the application configuration file, which may or may not exist.
+
+    Returns:
+        config_file: path to the application configuration file, which is confirmed to exist.
+
+    Raises:
+        SystemExit: if no configuration file exists, this exception is raised after an example configuration file has been created.
+    """
+    # set default path if one was not supplied
+    if not config_file:
+        config_file = Path.home() / ".restic-replica" / "config.toml"
+    # create config file and parent dir if config file does not exist
+    if not config_file.exists():
+        logger.info("Missing configuration file")
+        config_file.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(
+            Path("src/restic_replica/__assets__/example_config.toml"), config_file
+        )
+        logger.info(
+            f"An example configuration file has been created at {config_file}. Update the configuration in this file to match your system, and then re-run this program."
+        )
+        raise SystemExit(0)
+    else:
+        return config_file
 
 
 def read_config_file(config_file: Path) -> dict:

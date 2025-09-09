@@ -9,6 +9,26 @@ from restic_replica import app
 from restic_replica.repository import Repository, ResticCli
 
 
+class TestEnsureConfigFile:
+    """Tests for the function app.ensure_config_file"""
+
+    def test_existing_config_file(self, tmp_path):
+        assert app.ensure_config_file(tmp_path) == tmp_path
+
+    @mock.patch("pathlib.Path.exists", return_value=True)
+    def test_default_config_file_path(self, *args):
+        print("pause")
+        assert (
+            app.ensure_config_file() == Path.home() / ".restic-replica" / "config.toml"
+        )
+
+    @mock.patch("pathlib.Path.mkdir", return_value=None)
+    @mock.patch("shutil.copyfile", return_value=None)
+    def test_missing_config_file(self, *args):
+        with pytest.raises(SystemExit):
+            app.ensure_config_file(Path("/not/a/real/path"))
+
+
 class TestReadConfigFile:
     """Tests for the function app.read_config_file"""
 
