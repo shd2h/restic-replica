@@ -11,22 +11,13 @@ class TestSetupLogging:
     """Tests for the function console.setup_logging"""
 
     @pytest.mark.usefixtures("logger_fixture")
-    def test_default_logdir(self, logger_fixture):
-        """If no logdir specified, default logdir should be set"""
-        logger = console.setup_logging(logger_fixture)
-        assert (
-            Path(logger.handlers[1].baseFilename).parent
-            == Path.home() / ".restic-replica"
-        )
-
-    @pytest.mark.usefixtures("logger_fixture")
     def test_custom_logdir(self, logger_fixture, tmp_path):
         """Custom logdir should be set correctly"""
         logger = console.setup_logging(logger_fixture, logdir=tmp_path)
         assert Path(logger.handlers[1].baseFilename).parent == tmp_path
 
     @pytest.mark.usefixtures("logger_fixture")
-    def test_no_logfile(self, logger_fixture):
+    def test_no_logdir(self, logger_fixture):
         """Logdir set to None should result in no logfile handler"""
         logger = console.setup_logging(logger_fixture, logdir=None)
         assert len(logger.handlers) == 1
