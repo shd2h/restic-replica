@@ -6,7 +6,6 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 
-# TODO: decide about formatting
 # TODO: write into appdata for windows.
 def setup_logging(
     logger: logging.Logger = logging.getLogger("restic_replica"),
@@ -20,15 +19,14 @@ def setup_logging(
     else:
         logger.setLevel(logging.INFO)
 
-    # # setup formatting
-    # formatter = logging.Formatter(
-    #     fmt="%(asctime)s %(levelname)s: %(message)s",
-    #     datefmt="%Y-%m-%d %H:%M:%SZ",
-    # )
+    # setup formatting
+    formatter = logging.Formatter(
+        fmt="%(asctime)s %(levelname)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%SZ",
+    )
 
     # setup logging to console
     ch = logging.StreamHandler()
-    # ch.setFormatter(formatter)
     logger.addHandler(ch)
 
     # setup logging to file
@@ -38,7 +36,7 @@ def setup_logging(
         # create logging dir
         logdir.mkdir(parents=True, exist_ok=True)
         fh = logging.FileHandler("{0}/{1}".format(logdir, logname))
-        # fh.setFormatter(formatter)
+        fh.setFormatter(formatter)
         logger.addHandler(fh)
 
     # return the logger object
