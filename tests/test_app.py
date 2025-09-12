@@ -76,6 +76,20 @@ class TestReadConfigFile:
             app.read_config_file(f)
 
 
+class TestGetLogdir:
+    """Tests for the function app.get_logdir"""
+
+    def test_provided_logdir(self):
+        """An log directory path should be returned"""
+        assert app.get_logdir(
+            {"app": {"log_directory": "/var/log/restic-replica/"}}
+        ) == Path("/var/log/restic-replica/")
+
+    def test_missing_logdir(self):
+        """None should be returned if no log directory is provided"""
+        assert app.get_logdir({}) is None
+
+
 class TestGetRestic:
     """Tests for the function app.get_restic"""
 
