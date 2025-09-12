@@ -6,7 +6,6 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 
-# TODO: write into appdata for windows.
 def setup_logging(
     logger: logging.Logger = logging.getLogger("restic_replica"),
     logdir: Optional[Path] = None,

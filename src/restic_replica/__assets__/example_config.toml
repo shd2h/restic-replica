@@ -1,10 +1,10 @@
 [app]
-## Log directory  (default: ~/.restic-replica)
+## Log directory  (default: ~/.restic-replica, default(win): ~\AppData\Local\restic-replica)
 # log_directory = "/var/log/restic-replica/"
 
 
 [restic]
-## path to the restic binary to use  (default: restic)
+## path to the restic binary to use  (default: restic, default(win): restic.exe)
 # path = "/usr/local/bin/restic"
 
 [restic.environment]

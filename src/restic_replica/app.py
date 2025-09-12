@@ -11,7 +11,6 @@ from restic_replica.repository import Repository, ResticCli
 logger = logging.getLogger(__name__)
 
 
-# TODO: write into AppData for windows.
 def ensure_config_file(config_file: Optional[Path] = None) -> Path:
     """
     Search for config file in expected location. If one does not exist, create one, then raise SystemExit.
@@ -27,7 +26,10 @@ def ensure_config_file(config_file: Optional[Path] = None) -> Path:
     """
     # set default path if one was not supplied
     if not config_file:
-        config_file = Path.home() / ".restic-replica" / "config.toml"
+        if platform.system() == "Windows":
+            config_file = Path.home() / "AppData/Local/restic-replica/config.toml"
+        else:
+            config_file = Path.home() / ".restic-replica" / "config.toml"
     # create config file and parent dir if config file does not exist
     if not config_file.exists():
         print("ERROR: Missing configuration file")
@@ -66,7 +68,10 @@ def get_logdir(config: dict) -> Optional[Path]:
     try:
         return Path(config["app"]["log_directory"]).expanduser()
     except KeyError:
-        return Path.home() / ".restic-replica"
+        if platform.system() == "Windows":
+            return Path.home() / "AppData/Local/restic-replica"
+        else:
+            return Path.home() / ".restic-replica"
 
 
 def get_restic(config: dict) -> ResticCli:
