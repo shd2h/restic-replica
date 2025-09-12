@@ -64,7 +64,7 @@ def get_logdir(config: dict) -> Optional[Path]:
         logdir: path to logging directory specified in config
     """
     try:
-        return Path(config["app"]["log_directory"])
+        return Path(config["app"]["log_directory"]).expanduser()
     except KeyError:
         return Path.home() / ".restic-replica"
 

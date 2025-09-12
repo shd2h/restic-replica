@@ -85,6 +85,12 @@ class TestGetLogdir:
             {"app": {"log_directory": "/var/log/restic-replica/"}}
         ) == Path("/var/log/restic-replica/")
 
+    def test_provided_logdir_tilde(self):
+        """If tilde is used in the directory path, it should be expanded"""
+        assert app.get_logdir({"app": {"log_directory": "~/.restic-replica/"}}) == Path(
+            Path.home() / ".restic-replica/"
+        )
+
     def test_missing_logdir(self):
         """Default log directory should be returned if no log directory is provided"""
         assert app.get_logdir({}) == Path.home() / ".restic-replica"
