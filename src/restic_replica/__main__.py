@@ -4,8 +4,7 @@ from restic_replica import __version__, app, console
 def main():
     config_file = app.ensure_config_file()
     config = app.read_config_file(config_file)
-    # TODO: read the logging path from the config file. Allow setting to none?
-    logger = console.setup_logging()
+    logger = console.setup_logging(logdir=app.get_logdir(config))
     console.logging_headers(__version__)
     # get restic cli
     restic_cli = app.get_restic(config["restic"])
