@@ -53,7 +53,9 @@ def read_config_file(config_file: Path) -> dict:
 
 
 def get_logdir(config: dict) -> Optional[Path]:
-    """Return the path to the logging directory specified in config. Return None if no path is provided.
+    """
+    Return the path to the logging directory specified in config, or the default log
+    directory if no path is specified.
 
     Args:
         config: restic-replica configuration dictionary
@@ -64,7 +66,7 @@ def get_logdir(config: dict) -> Optional[Path]:
     try:
         return Path(config["app"]["log_directory"])
     except KeyError:
-        return None
+        return Path.home() / ".restic-replica"
 
 
 def get_restic(config: dict) -> ResticCli:
