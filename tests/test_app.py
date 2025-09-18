@@ -105,7 +105,7 @@ class TestGetLogdir:
     def test_missing_logdir_windows(self):
         """The default log directory for windows should be returned if no log directory is provided"""
         with mock.patch("platform.system", return_value="Windows"):
-            assert app.get_logdir({}) == Path.home() / "AppData/Local/.restic-replica"
+            assert app.get_logdir({}) == Path.home() / "AppData/Local/restic-replica"
 
 
 class TestGetRestic:
