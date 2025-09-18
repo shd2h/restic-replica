@@ -21,7 +21,7 @@ def setup_logging(
     # setup formatting
     formatter = logging.Formatter(
         fmt="%(asctime)s %(levelname)s: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%SZ",
+        datefmt="%Y-%m-%d %H:%M:%S%z",
     )
 
     # setup logging to console
