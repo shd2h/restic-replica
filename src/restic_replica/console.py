@@ -30,7 +30,7 @@ def setup_logging(
 
     # setup logging to file
     if logdir:
-        timestamp = datetime.now().isoformat(timespec="seconds")
+        timestamp = datetime.now().strftime("%Y%m%dT%H%M%S")
         logname = f"restic-replica_{timestamp}.log"
         # create logging dir
         logdir.mkdir(parents=True, exist_ok=True)
