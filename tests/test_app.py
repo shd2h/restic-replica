@@ -1,3 +1,4 @@
+import importlib.resources
 from pathlib import Path
 import pytest
 from subprocess import CalledProcessError, CompletedProcess
@@ -5,7 +6,7 @@ import textwrap
 import tomllib
 from unittest import mock
 
-from restic_replica import app
+from restic_replica import __assets__, app
 from restic_replica.repository import Repository, ResticCli
 
 
@@ -17,22 +18,50 @@ class TestEnsureConfigFile:
 
     @mock.patch("pathlib.Path.exists", return_value=True)
     @mock.patch("platform.system", return_value="Linux")
-    def test_default_config_file_path_nonwin(self, *args):
+    def test_existing_default_config_file_nonwin(self, *args):
         assert app.ensure_config_file() == Path.home() / ".restic-replica/config.toml"
 
     @mock.patch("pathlib.Path.exists", return_value=True)
     @mock.patch("platform.system", return_value="Windows")
-    def test_default_config_file_path_win(self, *args):
+    def test_existing_default_config_file_win(self, *args):
         assert (
             app.ensure_config_file()
             == Path.home() / "AppData/Local/restic-replica/config.toml"
         )
 
+    @mock.patch("platform.system", return_value="Linux")
+    @mock.patch("pathlib.Path.mkdir", return_value=None)
+    @mock.patch("shutil.copyfile", return_value=None)
+    def test_default_config_file_path_nonwin(self, *args):
+        with pytest.raises(SystemExit):
+            app.ensure_config_file()
+        args[0].assert_called_with(
+            importlib.resources.files(__assets__) / "example_config.toml",
+            Path.home() / ".restic-replica/config.toml",
+        )
+
+    @mock.patch("platform.system", return_value="Windows")
+    @mock.patch("pathlib.Path.mkdir", return_value=None)
+    @mock.patch("shutil.copyfile", return_value=None)
+    def test_default_config_file_path_win(self, *args):
+        with pytest.raises(SystemExit):
+            app.ensure_config_file()
+        args[0].assert_called_with(
+            importlib.resources.files(__assets__) / "example_config_win.toml",
+            Path.home() / "AppData/Local/restic-replica/config.toml",
+        )
+
+    @mock.patch("platform.system", return_value="Linux")
     @mock.patch("pathlib.Path.mkdir", return_value=None)
     @mock.patch("shutil.copyfile", return_value=None)
     def test_missing_config_file(self, *args):
+        target = Path("/not/a/real/path")
         with pytest.raises(SystemExit):
-            app.ensure_config_file(Path("/not/a/real/path"))
+            app.ensure_config_file(target)
+        args[0].assert_called_with(
+            importlib.resources.files(__assets__) / "example_config.toml",
+            target,
+        )
 
 
 class TestReadConfigFile:
