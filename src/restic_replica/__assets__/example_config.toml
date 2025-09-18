@@ -1,38 +1,38 @@
 [app]
 ## Log directory  (default: ~/.restic-replica, default(win): ~\AppData\Local\restic-replica)
-# log_directory = "/var/log/restic-replica/"
+# log_directory = '/var/log/restic-replica/'
 
 
 [restic]
 ## path to the restic binary to use  (default: restic, default(win): restic.exe)
-# path = "/usr/local/bin/restic"
+# path = '/usr/local/bin/restic'
 
 [restic.environment]
 ## environment variables common to all restic commmands
 ## WARNING: environment variables set here will overwrite any set on a per-repository basis.
-# RESTIC_PROGRESS_FPS = "0.003333"
+# RESTIC_PROGRESS_FPS = '0.003333'
 
 
 [source]
 ## Location of the source restic repository, where snapshots will be copied *from*. 
 ## This needs to be initialised in advance, but supports all of the restic repository types detailed here:
 ## https://restic.readthedocs.io/en/stable/030_preparing_a_new_repo.html
-repository_uri = "/backups/restic_repo"
+repository_uri = '/backups/restic_repo'
 
 ## repository password.
-password = "secret"
+password = 'secret'
 
 ## location of password file. 
 ## Note: this option overrides the "password" option, and is incompatible with "password_command".
-# password_file = "/path/to/password_file"
+# password_file = '/path/to/password_file'
 
 ## command printing the password for the repository to stdout.
 ## Note: this option overrides the "password" option, and is incompatible with "password_file".
-# password_command = "/path/to/password_command"
+# password_command = '/path/to/password_command'
 
 [source.environment]
 ## environment variables specific to the source repository
-# RESTIC_COMPRESSION = "true"
+# RESTIC_COMPRESSION = 'true'
 
 
 [destination]
@@ -45,20 +45,20 @@ password = "secret"
 ##   this are "RESTIC_PASSWORD", "RESTIC_PASSWORD_FILE", and "RESTIC_PASSWORD_COMMAND".
 ##   You can avoid  this limitation by using the rclone backend for one repository, along with remotes which are configured in rclone.
 ##   https://restic.readthedocs.io/en/stable/045_working_with_repos.html#copying-snapshots-between-repositories 
-repository_uri = "/offsite-backups/restic_repo"
+repository_uri = '/offsite-backups/restic_repo'
 
 ## repository password.
-password = "secret"
+password = 'secret'
 
 ## location of password file. 
 ## Note: this option overrides the "password" option, and is incompatible with "password_command".
-# password_file = "/path/to/password_file"
+# password_file = '/path/to/password_file'
 
 ## command printing the password for the repository to stdout.
 ## Note: this option overrides the "password" option, and is incompatible with "password_file".
-# password_command = "/path/to/password_command"
+# password_command = '/path/to/password_command'
 
 
 [destination.environment]
 ## environment variables specific to the destination repository
-# RESTIC_COMPRESSION = "true"
+# RESTIC_COMPRESSION = 'true'
