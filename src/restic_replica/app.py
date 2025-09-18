@@ -34,9 +34,7 @@ def ensure_config_file(config_file: Optional[Path] = None) -> Path:
     if not config_file.exists():
         print("ERROR: Missing configuration file")
         config_file.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(
-            Path("src/restic_replica/__assets__/example_config.toml"), config_file
-        )
+        shutil.copyfile(Path("__assets__/example_config.toml"), config_file)
         print(
             f"An example configuration file has been created at {config_file}. Update the configuration in this file to match your system, and then re-run this program."
         )
