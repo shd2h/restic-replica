@@ -34,7 +34,7 @@ def setup_logging(
         logname = f"restic-replica_{timestamp}.log"
         # create logging dir
         logdir.mkdir(parents=True, exist_ok=True)
-        fh = logging.FileHandler("{0}/{1}".format(logdir, logname))
+        fh = logging.FileHandler(logdir / f"{logname}")
         fh.setFormatter(formatter)
         logger.addHandler(fh)
 
