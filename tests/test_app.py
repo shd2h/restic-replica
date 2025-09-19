@@ -1,3 +1,4 @@
+import importlib.resources
 from pathlib import Path
 import pytest
 from subprocess import CalledProcessError, CompletedProcess
@@ -5,7 +6,7 @@ import textwrap
 import tomllib
 from unittest import mock
 
-from restic_replica import app
+from restic_replica import __assets__, app
 from restic_replica.repository import Repository, ResticCli
 
 
@@ -17,22 +18,52 @@ class TestEnsureConfigFile:
 
     @mock.patch("pathlib.Path.exists", return_value=True)
     @mock.patch("platform.system", return_value="Linux")
-    def test_default_config_file_path_nonwin(self, *args):
+    def test_existing_default_config_file_nonwin(self, *args):
         assert app.ensure_config_file() == Path.home() / ".restic-replica/config.toml"
 
     @mock.patch("pathlib.Path.exists", return_value=True)
     @mock.patch("platform.system", return_value="Windows")
-    def test_default_config_file_path_win(self, *args):
+    def test_existing_default_config_file_win(self, *args):
         assert (
             app.ensure_config_file()
             == Path.home() / "AppData/Local/restic-replica/config.toml"
         )
 
+    @mock.patch("pathlib.Path.exists", return_value=False)
+    @mock.patch("platform.system", return_value="Linux")
+    @mock.patch("pathlib.Path.mkdir", return_value=None)
+    @mock.patch("shutil.copyfile", return_value=None)
+    def test_default_config_file_path_nonwin(self, *args):
+        with pytest.raises(SystemExit):
+            app.ensure_config_file()
+        args[0].assert_called_with(
+            importlib.resources.files(__assets__) / "example_config.toml",
+            Path.home() / ".restic-replica/config.toml",
+        )
+
+    @mock.patch("pathlib.Path.exists", return_value=False)
+    @mock.patch("platform.system", return_value="Windows")
+    @mock.patch("pathlib.Path.mkdir", return_value=None)
+    @mock.patch("shutil.copyfile", return_value=None)
+    def test_default_config_file_path_win(self, *args):
+        with pytest.raises(SystemExit):
+            app.ensure_config_file()
+        args[0].assert_called_with(
+            importlib.resources.files(__assets__) / "example_config_win.toml",
+            Path.home() / "AppData/Local/restic-replica/config.toml",
+        )
+
+    @mock.patch("platform.system", return_value="Linux")
     @mock.patch("pathlib.Path.mkdir", return_value=None)
     @mock.patch("shutil.copyfile", return_value=None)
     def test_missing_config_file(self, *args):
+        target = Path("/not/a/real/path")
         with pytest.raises(SystemExit):
-            app.ensure_config_file(Path("/not/a/real/path"))
+            app.ensure_config_file(target)
+        args[0].assert_called_with(
+            importlib.resources.files(__assets__) / "example_config.toml",
+            target,
+        )
 
 
 class TestReadConfigFile:
@@ -105,7 +136,7 @@ class TestGetLogdir:
     def test_missing_logdir_windows(self):
         """The default log directory for windows should be returned if no log directory is provided"""
         with mock.patch("platform.system", return_value="Windows"):
-            assert app.get_logdir({}) == Path.home() / "AppData/Local/.restic-replica"
+            assert app.get_logdir({}) == Path.home() / "AppData/Local/restic-replica"
 
 
 class TestGetRestic:
@@ -216,6 +247,19 @@ class TestCheckRepositoryAccess:
             with pytest.raises(RuntimeError):
                 app.check_repository_access(repository_fixture)
 
+    @pytest.mark.usefixtures("repository_fixture")
+    def test_restic_error(self, repository_fixture):
+        """Should raise a RuntimeError if the OS throws an exception accessing restic"""
+        with mock.patch.object(
+            repository_fixture,
+            "snapshots",
+            side_effect=FileNotFoundError(
+                "[Errno 2] No such file or directory: '/usr/local/bin/restic'"
+            ),
+        ):
+            with pytest.raises(RuntimeError):
+                app.check_repository_access(repository_fixture)
+
 
 class TestCopySnapshots:
     """Tests for the function app.copy_snapshots"""
@@ -246,6 +290,27 @@ class TestCopySnapshots:
             repository_fixture,
             "copy",
             side_effect=CalledProcessError(1, "notalrealcommand"),
+        ):
+            with pytest.raises(RuntimeError):
+                app.copy_snapshots(
+                    repository_fixture,
+                    Repository(
+                        "/tmp/restic-repo2",
+                        "myrepo2",
+                        restic_cli_fixture,
+                        password="secret2",
+                    ),
+                )
+
+    @pytest.mark.usefixtures("repository_fixture", "restic_cli_fixture")
+    def test_restic_error(self, repository_fixture, restic_cli_fixture):
+        """Should raise a RuntimeError if the OS throws an exception accessing restic"""
+        with mock.patch.object(
+            repository_fixture,
+            "copy",
+            side_effect=FileNotFoundError(
+                "[Errno 2] No such file or directory: '/usr/local/bin/restic'"
+            ),
         ):
             with pytest.raises(RuntimeError):
                 app.copy_snapshots(

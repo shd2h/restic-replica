@@ -7,27 +7,77 @@ from pathlib import Path
 from restic_replica import console
 
 
+class TestInfoOnly:
+    """Tests for the class console.InfoOnly"""
+
+    @pytest.mark.parametrize(
+        "log_level, expectation",
+        [
+            (logging.DEBUG, False),
+            (logging.INFO, True),
+            (logging.WARNING, False),
+            (logging.ERROR, False),
+            (logging.CRITICAL, False),
+        ],
+    )
+    def test_filter(self, log_level, expectation):
+        """Function filter should return only messages of level logging.INFO"""
+
+        log_record = logging.LogRecord(None, log_level, None, None, None, None, None)
+        assert console.InfoOnly.filter(None, log_record) is expectation
+
+
+class TestNoInfo:
+    """Tests for the class console.NoInfo"""
+
+    @pytest.mark.parametrize(
+        "log_level, expectation",
+        [
+            (logging.DEBUG, True),
+            (logging.INFO, False),
+            (logging.WARNING, True),
+            (logging.ERROR, True),
+            (logging.CRITICAL, True),
+        ],
+    )
+    def test_filter(self, log_level, expectation):
+        """Function filter should return all messages except those with level logging.INFO"""
+
+        log_record = logging.LogRecord(None, log_level, None, None, None, None, None)
+        assert console.NoInfo.filter(None, log_record) is expectation
+
+
 class TestSetupLogging:
     """Tests for the function console.setup_logging"""
+
+    @pytest.mark.usefixtures("logger_fixture")
+    def test_handlers(self, logger_fixture, tmp_path):
+        """Two StreamHandlers and one FileHandler should be configured"""
+        logger = console.setup_logging(logger_fixture, logdir=tmp_path)
+        assert len(logger.handlers) == 3
+        assert isinstance(logger.handlers[0], logging.StreamHandler)
+        assert isinstance(logger.handlers[1], logging.StreamHandler)
+        assert isinstance(logger.handlers[2], logging.FileHandler)
 
     @pytest.mark.usefixtures("logger_fixture")
     def test_custom_logdir(self, logger_fixture, tmp_path):
         """Custom logdir should be set correctly"""
         logger = console.setup_logging(logger_fixture, logdir=tmp_path)
-        assert Path(logger.handlers[1].baseFilename).parent == tmp_path
+        assert Path(logger.handlers[2].baseFilename).parent == tmp_path
 
     @pytest.mark.usefixtures("logger_fixture")
     def test_no_logdir(self, logger_fixture):
         """Logdir set to None should result in no logfile handler"""
         logger = console.setup_logging(logger_fixture, logdir=None)
-        assert len(logger.handlers) == 1
+        assert len(logger.handlers) == 2
         assert isinstance(logger.handlers[0], logging.StreamHandler)
+        assert isinstance(logger.handlers[1], logging.StreamHandler)
 
     @pytest.mark.usefixtures("logger_fixture")
     def test_logname(self, logger_fixture, tmp_path):
         """Log name should be made up of program name and iso timestamp"""
         logger = console.setup_logging(logger_fixture, logdir=tmp_path)
-        logname = Path(logger.handlers[1].baseFilename).stem
+        logname = Path(logger.handlers[2].baseFilename).stem
         logname_parts = logname.split("_")
         assert logname_parts[0] == "restic-replica"
         assert datetime.fromisoformat(logname_parts[1]) is not None

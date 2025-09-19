@@ -1,11 +1,11 @@
 [app]
-## Log directory  (default: ~/.restic-replica)
-# log_directory = '/var/log/restic-replica/'
+## Log directory  (default: ~\AppData\Local\restic-replica)
+# log_directory = 'C:\restic-replica\logs'
 
 
 [restic]
-## path to the restic binary to use  (default: restic)
-# path = '/usr/local/bin/restic'
+## path to the restic binary to use  (default: restic.exe)
+# path = 'C:\restic.exe'
 
 [restic.environment]
 ## environment variables common to all restic commmands
@@ -17,18 +17,18 @@
 ## Location of the source restic repository, where snapshots will be copied *from*. 
 ## This needs to be initialised in advance, but supports all of the restic repository types detailed here:
 ## https://restic.readthedocs.io/en/stable/030_preparing_a_new_repo.html
-repository_uri = '/backups/restic_repo'
+repository_uri = 'C:\backups\restic_repo'
 
 ## repository password.
 password = 'secret'
 
 ## location of password file. 
 ## Note: this option overrides the "password" option, and is incompatible with "password_command".
-# password_file = '/path/to/password_file'
+# password_file = 'C:\path\to\password_file'
 
 ## command printing the password for the repository to stdout.
 ## Note: this option overrides the "password" option, and is incompatible with "password_file".
-# password_command = '/path/to/password_command'
+# password_command = 'C:\path\to\password_command'
 
 [source.environment]
 ## environment variables specific to the source repository
@@ -45,18 +45,18 @@ password = 'secret'
 ##   this are "RESTIC_PASSWORD", "RESTIC_PASSWORD_FILE", and "RESTIC_PASSWORD_COMMAND".
 ##   You can avoid  this limitation by using the rclone backend for one repository, along with remotes which are configured in rclone.
 ##   https://restic.readthedocs.io/en/stable/045_working_with_repos.html#copying-snapshots-between-repositories 
-repository_uri = '/offsite-backups/restic_repo'
+repository_uri = 'C:\offsite-backups\restic_repo'
 
 ## repository password.
 password = 'secret'
 
 ## location of password file. 
 ## Note: this option overrides the "password" option, and is incompatible with "password_command".
-# password_file = '/path/to/password_file'
+# password_file = 'C:\path\to\password_file'
 
 ## command printing the password for the repository to stdout.
 ## Note: this option overrides the "password" option, and is incompatible with "password_file".
-# password_command = '/path/to/password_command'
+# password_command = 'C:\path\to\password_command'
 
 
 [destination.environment]

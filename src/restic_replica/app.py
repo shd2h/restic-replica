@@ -1,3 +1,4 @@
+import importlib.resources
 import logging
 from pathlib import Path
 import platform
@@ -6,6 +7,7 @@ from subprocess import CalledProcessError, CompletedProcess
 import tomllib
 from typing import Optional
 
+from restic_replica import __assets__
 from restic_replica.repository import Repository, ResticCli
 
 logger = logging.getLogger(__name__)
@@ -34,9 +36,16 @@ def ensure_config_file(config_file: Optional[Path] = None) -> Path:
     if not config_file.exists():
         print("ERROR: Missing configuration file")
         config_file.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(
-            Path("src/restic_replica/__assets__/example_config.toml"), config_file
-        )
+        if platform.system() == "Windows":
+            shutil.copyfile(
+                importlib.resources.files(__assets__) / "example_config_win.toml",
+                config_file,
+            )
+        else:
+            shutil.copyfile(
+                importlib.resources.files(__assets__) / "example_config.toml",
+                config_file,
+            )
         print(
             f"An example configuration file has been created at {config_file}. Update the configuration in this file to match your system, and then re-run this program."
         )
@@ -129,7 +138,7 @@ def get_repository(name: str, config: dict, restic_cli: ResticCli) -> Repository
 def check_repository_access(repository: Repository) -> bool:
     try:
         return bool(repository.snapshots())
-    except CalledProcessError as err:
+    except (CalledProcessError, OSError) as err:
         logger.error(err)
         raise RuntimeError(f"Unable to access restic repository {repository}") from err
 
@@ -139,7 +148,7 @@ def copy_snapshots(
 ) -> CompletedProcess:
     try:
         return destination_repository.copy(source_repository, live_output=True)
-    except CalledProcessError as err:
+    except (CalledProcessError, OSError) as err:
         logger.error(err)
         raise RuntimeError(
             f"error copying snapshots from {source_repository.uri} to {destination_repository.uri}"

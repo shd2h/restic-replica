@@ -1,10 +1,19 @@
+from importlib import metadata
 import logging
+from packaging import version
 from pathlib import Path
 import pytest
 from subprocess import CompletedProcess
 from unittest import mock
 
-from restic_replica import __main__
+from restic_replica import __version__, __main__
+
+
+def test_version():
+    """The application version in pyproject.toml must match the application version in restic_replica/__init__.py"""
+    assert version.parse(__version__) == version.parse(
+        metadata.version("restic-replica")
+    )
 
 
 class TestMain:
