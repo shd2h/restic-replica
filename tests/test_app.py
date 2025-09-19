@@ -29,6 +29,7 @@ class TestEnsureConfigFile:
             == Path.home() / "AppData/Local/restic-replica/config.toml"
         )
 
+    @mock.patch("pathlib.Path.exists", return_value=False)
     @mock.patch("platform.system", return_value="Linux")
     @mock.patch("pathlib.Path.mkdir", return_value=None)
     @mock.patch("shutil.copyfile", return_value=None)
@@ -40,6 +41,7 @@ class TestEnsureConfigFile:
             Path.home() / ".restic-replica/config.toml",
         )
 
+    @mock.patch("pathlib.Path.exists", return_value=False)
     @mock.patch("platform.system", return_value="Windows")
     @mock.patch("pathlib.Path.mkdir", return_value=None)
     @mock.patch("shutil.copyfile", return_value=None)
