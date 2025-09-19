@@ -1,6 +1,6 @@
 [project]
 name = "restic-replica"
-version = "0.1.1.dev0+b1f94cc"
+version = "0.1.2.dev0"
 description = "python-based cli tool to copy restic snapshots between repositories"
 readme = "README.md"
 requires-python = ">=3.11"

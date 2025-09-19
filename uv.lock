@@ -202,7 +202,7 @@ wheels = [
 
 [[package]]
 name = "restic-replica"
-version = "0.1.1.dev0+b1f94cc"
+version = "0.1.2.dev0"
 source = { editable = "." }
 
 [package.dev-dependencies]
