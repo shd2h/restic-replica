@@ -6,6 +6,20 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 
+class InfoOnly(logging.Filter):
+    """Return only messages of level logging.INFO"""
+
+    def filter(self, record):
+        return record.levelno == logging.INFO
+
+
+class NoInfo(logging.Filter):
+    """Return all messages except those with level logging.INFO"""
+
+    def filter(self, record):
+        return record.levelno != logging.INFO
+
+
 def setup_logging(
     logger: logging.Logger = logging.getLogger("restic_replica"),
     logdir: Optional[Path] = None,
@@ -18,15 +32,16 @@ def setup_logging(
     else:
         logger.setLevel(logging.INFO)
 
-    # setup formatting
-    formatter = logging.Formatter(
-        fmt="%(asctime)s %(levelname)s: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S%z",
-    )
-
-    # setup logging to console
+    # console handling is split into two, so the levelname is not prepended to info messages, for aesthetic reasons.
+    # setup logging to console for all messages _except_ info (i.e. debug, warn, error, fatal)
     ch = logging.StreamHandler()
+    ch.addFilter(NoInfo())
+    ch.setFormatter(logging.Formatter(fmt="%(levelname)s: %(message)s"))
     logger.addHandler(ch)
+    # setup logging to console for info messages
+    ch_info = logging.StreamHandler()
+    ch_info.addFilter(InfoOnly())
+    logger.addHandler(ch_info)
 
     # setup logging to file
     if logdir:
@@ -35,7 +50,11 @@ def setup_logging(
         # create logging dir
         logdir.mkdir(parents=True, exist_ok=True)
         fh = logging.FileHandler(logdir / f"{logname}")
-        fh.setFormatter(formatter)
+        fh_formatter = logging.Formatter(
+            fmt="%(asctime)s %(levelname)s: %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S%z",
+        )
+        fh.setFormatter(fh_formatter)
         logger.addHandler(fh)
 
     # return the logger object
