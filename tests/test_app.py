@@ -245,6 +245,19 @@ class TestCheckRepositoryAccess:
             with pytest.raises(RuntimeError):
                 app.check_repository_access(repository_fixture)
 
+    @pytest.mark.usefixtures("repository_fixture")
+    def test_restic_error(self, repository_fixture):
+        """Should raise a RuntimeError if the OS throws an exception accessing restic"""
+        with mock.patch.object(
+            repository_fixture,
+            "snapshots",
+            side_effect=FileNotFoundError(
+                "[Errno 2] No such file or directory: '/usr/local/bin/restic'"
+            ),
+        ):
+            with pytest.raises(RuntimeError):
+                app.check_repository_access(repository_fixture)
+
 
 class TestCopySnapshots:
     """Tests for the function app.copy_snapshots"""
@@ -275,6 +288,27 @@ class TestCopySnapshots:
             repository_fixture,
             "copy",
             side_effect=CalledProcessError(1, "notalrealcommand"),
+        ):
+            with pytest.raises(RuntimeError):
+                app.copy_snapshots(
+                    repository_fixture,
+                    Repository(
+                        "/tmp/restic-repo2",
+                        "myrepo2",
+                        restic_cli_fixture,
+                        password="secret2",
+                    ),
+                )
+
+    @pytest.mark.usefixtures("repository_fixture", "restic_cli_fixture")
+    def test_restic_error(self, repository_fixture, restic_cli_fixture):
+        """Should raise a RuntimeError if the OS throws an exception accessing restic"""
+        with mock.patch.object(
+            repository_fixture,
+            "copy",
+            side_effect=FileNotFoundError(
+                "[Errno 2] No such file or directory: '/usr/local/bin/restic'"
+            ),
         ):
             with pytest.raises(RuntimeError):
                 app.copy_snapshots(

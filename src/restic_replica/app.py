@@ -138,7 +138,7 @@ def get_repository(name: str, config: dict, restic_cli: ResticCli) -> Repository
 def check_repository_access(repository: Repository) -> bool:
     try:
         return bool(repository.snapshots())
-    except CalledProcessError as err:
+    except (CalledProcessError, OSError) as err:
         logger.error(err)
         raise RuntimeError(f"Unable to access restic repository {repository}") from err
 
@@ -148,7 +148,7 @@ def copy_snapshots(
 ) -> CompletedProcess:
     try:
         return destination_repository.copy(source_repository, live_output=True)
-    except CalledProcessError as err:
+    except (CalledProcessError, OSError) as err:
         logger.error(err)
         raise RuntimeError(
             f"error copying snapshots from {source_repository.uri} to {destination_repository.uri}"
