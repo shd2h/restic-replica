@@ -1,13 +1,16 @@
+import sys
+
 from restic_replica import __version__, app, console
 
 
-def main():
+def main(argv=sys.argv[1:]):
+    args = console.parse_cli_args(argv)
     config_file = app.ensure_config_file()
     config = app.read_config_file(config_file)
     logger = console.setup_logging(logdir=app.get_logdir(config))
     console.logging_headers(__version__)
     # get restic cli
-    restic_cli = app.get_restic(config["restic"])
+    restic_cli = app.get_restic(config["restic"], verbose=args.verbose)
     # instance source and target repositories
     source = app.get_repository("source", config["source"], restic_cli)
     destination = app.get_repository("target", config["destination"], restic_cli)

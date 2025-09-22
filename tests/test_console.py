@@ -4,7 +4,7 @@ import pytest
 from unittest import mock
 from pathlib import Path
 
-from restic_replica import console
+from restic_replica import __version__, console
 
 
 class TestInfoOnly:
@@ -45,6 +45,23 @@ class TestNoInfo:
 
         log_record = logging.LogRecord(None, log_level, None, None, None, None, None)
         assert console.NoInfo.filter(None, log_record) is expectation
+
+
+class TestParseCliArgs:
+    """Tests for the function console.parse_cli_args"""
+
+    def test_version(self, capsys):
+        """Should print the name and version of the package, then exit"""
+        with pytest.raises(SystemExit):
+            console.parse_cli_args(["--version"])
+        captured = capsys.readouterr()
+        assert captured.out.strip() == f"restic-replica {__version__}"
+
+    def test_verbose(self):
+        """should set verbose boolean"""
+        assert console.parse_cli_args([]).verbose == 0
+        assert console.parse_cli_args(["-v"]).verbose == 1
+        assert console.parse_cli_args(["--verbose"]).verbose == 1
 
 
 class TestSetupLogging:

@@ -84,7 +84,7 @@ class TestMain:
     def test_copy_success(self, caplog):
         """A successful copy should log an informational message"""
         caplog.set_level(logging.INFO)
-        __main__.main()
+        __main__.main([])
         assert caplog.records[3].message == "Finished copying snapshots"
 
     @mock.patch(
@@ -96,7 +96,7 @@ class TestMain:
     def test_no_snapshots(self, mock_func_under_test, caplog):
         """If there are no snapshots to copy, an informational message should be logged"""
         caplog.set_level(logging.INFO)
-        __main__.main()
+        __main__.main([])
         assert (
             caplog.records[3].message
             == "All snapshots from the source are already present in the destination repository"
@@ -106,7 +106,7 @@ class TestMain:
     def test_repository_access_failure(self, mock_func_under_test):
         """A repository access failure should raise a SystemExit"""
         with pytest.raises(SystemExit):
-            __main__.main()
+            __main__.main([])
         # The destination repository should not be checked if the access check on the source fails
         mock_func_under_test.assert_called_once()
 
@@ -114,4 +114,4 @@ class TestMain:
     def test_copy_failure(self, *args):
         """A snapshot copy failure should raise a SystemExit"""
         with pytest.raises(SystemExit):
-            __main__.main()
+            __main__.main([])

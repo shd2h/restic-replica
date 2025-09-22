@@ -144,6 +144,13 @@ class TestResticCli:
             assert process.args == ["restic", "snapshots", "--json"]
 
         @pytest.mark.usefixtures("restic_cli_fixture")
+        def test_verbose(self, fp, restic_cli_fixture):
+            restic_cli_fixture.verbose = 1
+            fp.register(["restic", "snapshots", "--verbose=1"], stdout=None)
+            process = restic_cli_fixture.execute(["snapshots"])
+            assert process.args == ["restic", "snapshots", "--verbose=1"]
+
+        @pytest.mark.usefixtures("restic_cli_fixture")
         def test_live_output(self, restic_cli_fixture):
             fake_return = subprocess.CompletedProcess(["./foo"], 0)
             with mock.patch.object(

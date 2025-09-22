@@ -17,10 +17,12 @@ class ResticCli:
     Args:
         path: path to the restic binary
         environment_vars: dictionary of environment variables
+        verbose: how verbose to be, max level/times is 2
     """
 
     path: Path
     environment_vars: dict[str, str]
+    verbose: Optional[int] = 0
 
     def _execute_live_output(self, arguments: list[str]) -> subprocess.CompletedProcess:
         """Execute the command "arguments" and write stdout/stderr from the command to logger."""
@@ -88,6 +90,9 @@ class ResticCli:
         local_env_vars.update(self.environment_vars)
         # prepend restic binary path to args
         local_args.insert(0, str(self.path))
+        # optionally set verbose level
+        if self.verbose > 0:
+            local_args.append(f"--verbose={self.verbose}")
         # optionally add json flag
         if json:
             local_args.append("--json")
