@@ -14,16 +14,30 @@ class TestEnsureConfigFile:
     """Tests for the function app.ensure_config_file"""
 
     def test_existing_config_file(self, tmp_path):
+        """
+        if a path to a config file is supplied, and the file exists, the path to the
+        file should be returned.
+        """
         assert app.ensure_config_file(tmp_path) == tmp_path
 
     @mock.patch("pathlib.Path.exists", return_value=True)
     @mock.patch("platform.system", return_value="Linux")
     def test_existing_default_config_file_nonwin(self, *args):
+        """
+        if no path to a config file is supplied, and the platform is non-windows, and
+        the default config file exists, the default config file path for non-windows
+        should be returned.
+        """
         assert app.ensure_config_file() == Path.home() / ".restic-replica/config.toml"
 
     @mock.patch("pathlib.Path.exists", return_value=True)
     @mock.patch("platform.system", return_value="Windows")
     def test_existing_default_config_file_win(self, *args):
+        """
+        if no path to a config file is supplied, and the platform is windows, and the
+        default config file exists, the default config file path for windows should be
+        returned.
+        """
         assert (
             app.ensure_config_file()
             == Path.home() / "AppData/Local/restic-replica/config.toml"
@@ -34,6 +48,10 @@ class TestEnsureConfigFile:
     @mock.patch("pathlib.Path.mkdir", return_value=None)
     @mock.patch("shutil.copyfile", return_value=None)
     def test_default_config_file_path_nonwin(self, *args):
+        """
+        if no path to a config file is supplied, and the platform is non-windows, and
+        the default config file does not exist, a SystemExit exception should be raised.
+        """
         with pytest.raises(SystemExit):
             app.ensure_config_file()
         args[0].assert_called_with(
@@ -46,6 +64,10 @@ class TestEnsureConfigFile:
     @mock.patch("pathlib.Path.mkdir", return_value=None)
     @mock.patch("shutil.copyfile", return_value=None)
     def test_default_config_file_path_win(self, *args):
+        """
+        if no path to a config file is supplied, and the platform is windows, and the
+        default config file does not exist, a SystemExit exception should be raised.
+        """
         with pytest.raises(SystemExit):
             app.ensure_config_file()
         args[0].assert_called_with(
@@ -57,6 +79,10 @@ class TestEnsureConfigFile:
     @mock.patch("pathlib.Path.mkdir", return_value=None)
     @mock.patch("shutil.copyfile", return_value=None)
     def test_missing_config_file(self, *args):
+        """
+        if a path to a config file is supplied, and the file does not exist, a
+        SystemExit exception should be raised.
+        """
         target = Path("/not/a/real/path")
         with pytest.raises(SystemExit):
             app.ensure_config_file(target)

@@ -17,6 +17,9 @@ def ensure_config_file(config_file: Optional[Path] = None) -> Path:
     """
     Search for config file in expected location. If one does not exist, create one, then raise SystemExit.
 
+    Note: This function is called pre-logging setup, so any messages are printed to
+    stdout.
+
     Args:
         config_file: path to the application configuration file, which may or may not exist.
 
@@ -55,6 +58,18 @@ def ensure_config_file(config_file: Optional[Path] = None) -> Path:
 
 
 def read_config_file(config_file: Path) -> dict:
+    """
+    Load the toml file at config_file and return the contents as a dictionary.
+
+    Note: This function is called pre-logging setup, so any messages are printed to
+    stdout.
+
+    Args:
+        config_file: path to the application configuration file
+
+    Returns:
+        config: configuration file contents as a dictionary
+    """
     try:
         with open(config_file, "rb") as f:
             return tomllib.load(f)
@@ -84,7 +99,16 @@ def get_logdir(config: dict) -> Optional[Path]:
 
 
 def get_restic(config: dict, verbose: Optional[int] = 0) -> ResticCli:
-    """return a ResticCli instance populated with the information from config"""
+    """
+    Return a ResticCli instance populated with the information from config
+
+    Args:
+        config: restic configuration dictionary
+        verbose: verbosity level of returned ResticCli instance
+
+    Returns:
+        a populated ResticCli instance
+    """
     # if the restic path is not specified, set it
     try:
         path = Path(config["path"])
@@ -105,6 +129,17 @@ def get_restic(config: dict, verbose: Optional[int] = 0) -> ResticCli:
 
 
 def get_repository(name: str, config: dict, restic_cli: ResticCli) -> Repository:
+    """
+    Return a Repository instance populated with the information from config
+
+    Args:
+        name: friendly name for the repsository
+        config: repository configuration dictionary
+        restic_cli: ResticCli instance that the repository will use for operations
+
+    Returns:
+        a populated Repository instance
+    """
     # non-optional config data
     uri = config["repository_uri"]
     # optional config data
@@ -136,6 +171,15 @@ def get_repository(name: str, config: dict, restic_cli: ResticCli) -> Repository
 
 
 def check_repository_access(repository: Repository) -> bool:
+    """
+    Verify that a repository can be accessed successfully
+
+    Returns:
+        a boolean indicating operation success
+
+    Raises:
+        RunTimeError: raised if operation fails
+    """
     try:
         return bool(repository.snapshots())
     except (CalledProcessError, OSError) as err:
@@ -146,6 +190,15 @@ def check_repository_access(repository: Repository) -> bool:
 def copy_snapshots(
     source_repository: Repository, destination_repository: Repository
 ) -> CompletedProcess:
+    """
+    Copy snapshots from source_repository repository to destination_repository
+
+    Returns:
+        a populated CompletedProcess instance
+
+    Raises:
+        RunTimeError: raised if operation fails
+    """
     try:
         return destination_repository.copy(source_repository, live_output=True)
     except (CalledProcessError, OSError) as err:

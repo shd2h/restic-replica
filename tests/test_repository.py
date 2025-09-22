@@ -16,6 +16,7 @@ class TestResticCli:
 
         @pytest.mark.usefixtures("restic_cli_fixture")
         def test_args(self, fp, restic_cli_fixture):
+            """arguments should be passed through to the process"""
             args = ["restic", "snapshots"]
             fp.register(
                 args,
@@ -34,6 +35,7 @@ class TestResticCli:
 
         @pytest.mark.usefixtures("restic_cli_fixture")
         def test_logger_output(self, fp, caplog, restic_cli_fixture):
+            """output from the process should be emitted to logger line by line"""
             caplog.set_level(logging.INFO)
             args = ["restic", "snapshots"]
             fp.register(
@@ -79,6 +81,7 @@ class TestResticCli:
             ],
         )
         def test_returncodes(self, fp, restic_cli_fixture, returncode, expectation):
+            """exit codes 0 and 3 should not raise an Exception, all other exit codes should"""
             args = ["restic", "snapshots"]
             with expectation:
                 fp.register(args, returncode=returncode, stdout=None)
@@ -90,6 +93,7 @@ class TestResticCli:
 
         @pytest.mark.usefixtures("restic_cli_fixture")
         def test_args_copy(self, fp, restic_cli_fixture):
+            """input arguments should not be mutated"""
             args = ["snapshots"]
             args_with_restic = ["restic", "snapshots"]
             # register the args, prepending restic path
@@ -102,6 +106,10 @@ class TestResticCli:
 
         @pytest.mark.usefixtures("restic_cli_fixture")
         def test_class_env_vars(self, fp, restic_cli_fixture):
+            """
+            environment variables should be set, with the ResticCli fixture environment
+            variables having primacy. The input ductionary should not be mutated.
+            """
             environment_vars = {
                 "RESTIC_PROGRESS_FPS": "60",
                 "RESTIC_PASSWORD": "secret",
@@ -120,6 +128,7 @@ class TestResticCli:
 
         @pytest.mark.usefixtures("restic_cli_fixture")
         def test_output_return(self, fp, restic_cli_fixture):
+            """output from the command should be returned"""
             fake_stdout = [
                 "repository a977efd9 opened (version 2, compression level auto)",
                 "ID        Time                 Host          Tags        Paths       Size",
@@ -139,12 +148,14 @@ class TestResticCli:
 
         @pytest.mark.usefixtures("restic_cli_fixture")
         def test_json(self, fp, restic_cli_fixture):
+            """the json parameter should be appended to the arguments"""
             fp.register(["restic", "snapshots", "--json"], stdout=None)
             process = restic_cli_fixture.execute(["snapshots"], json=True)
             assert process.args == ["restic", "snapshots", "--json"]
 
         @pytest.mark.usefixtures("restic_cli_fixture")
         def test_verbose(self, fp, restic_cli_fixture):
+            """the verbose parameter should be appended to the arguments"""
             restic_cli_fixture.verbose = 1
             fp.register(["restic", "snapshots", "--verbose=1"], stdout=None)
             process = restic_cli_fixture.execute(["snapshots"])
@@ -152,6 +163,7 @@ class TestResticCli:
 
         @pytest.mark.usefixtures("restic_cli_fixture")
         def test_live_output(self, restic_cli_fixture):
+            """the live output process should return a populated CompletedProcess instance"""
             fake_return = subprocess.CompletedProcess(["./foo"], 0)
             with mock.patch.object(
                 restic_cli_fixture, "_execute_live_output", return_value=fake_return
@@ -170,6 +182,10 @@ class TestRepository:
 
         @pytest.mark.usefixtures("repository_fixture")
         def test_environment_vars_merge(self, repository_fixture):
+            """
+            supplied password should result in the correct environment variable being
+            appended to the existing environment variables dictionary.
+            """
             assert repository_fixture.environment_vars == {
                 "RESTIC_COMPRESSION": "true",
                 "RESTIC_PASSWORD": "secret",
@@ -177,6 +193,7 @@ class TestRepository:
 
         @pytest.mark.usefixtures("restic_cli_fixture")
         def test_password_file_environment_var(self, restic_cli_fixture):
+            """supplied password file should result in the correct environment variable being set"""
             myrepo = repository.Repository(
                 "/tmp/myrepo",
                 "myrepo",
@@ -189,6 +206,7 @@ class TestRepository:
 
         @pytest.mark.usefixtures("restic_cli_fixture")
         def test_password_command_environment_var(self, restic_cli_fixture):
+            """supplied password command should result in the correct environment variable being set"""
             myrepo = repository.Repository(
                 "/tmp/myrepo",
                 "myrepo",
@@ -263,9 +281,11 @@ class TestRepository:
         """Tests for the snapshots method"""
 
         def return_args(self, *args, **kwargs):
+            """function that returns all args passed to it"""
             return args
 
         def return_kwargs(self, *args, **kwargs):
+            """function that returns all kwargs passed to it"""
             return kwargs
 
         @pytest.mark.usefixtures("repository_fixture")
@@ -299,6 +319,7 @@ class TestRepository:
 
         @pytest.mark.usefixtures("repository_fixture")
         def test_live_output(self, repository_fixture):
+            """live_output var should be set to false by default"""
             with mock.patch.object(
                 repository_fixture.restic_cli,
                 "execute",
@@ -312,6 +333,7 @@ class TestRepository:
 
         @pytest.mark.usefixtures("repository_fixture")
         def test_json(self, repository_fixture):
+            """json var should be set to false by default"""
             with mock.patch.object(
                 repository_fixture.restic_cli,
                 "execute",
@@ -324,9 +346,11 @@ class TestRepository:
         """Tests for the copy method"""
 
         def return_args(self, *args, **kwargs):
+            """function that returns all args passed to it"""
             return args
 
         def return_kwargs(self, *args, **kwargs):
+            """function that returns all kwargs passed to it"""
             return kwargs
 
         @pytest.fixture
@@ -339,6 +363,7 @@ class TestRepository:
 
         @pytest.mark.usefixtures("repository_fixture")
         def test_same_repository(self, repository_fixture):
+            """if the same repository is set as both source and destination a RuntimeError should be raised"""
             with pytest.raises(RuntimeError):
                 repository_fixture.copy(repository_fixture)
 
@@ -428,6 +453,7 @@ class TestRepository:
 
         @pytest.mark.usefixtures("repository_fixture", "other_repository_fixture")
         def test_live_output(self, repository_fixture, other_repository_fixture):
+            """live_output should be set to false by default"""
             with mock.patch.object(
                 repository_fixture.restic_cli,
                 "execute",
@@ -446,6 +472,7 @@ class TestRepository:
 
         @pytest.mark.usefixtures("repository_fixture", "other_repository_fixture")
         def test_json(self, repository_fixture, other_repository_fixture):
+            """json should be set to false by default"""
             with mock.patch.object(
                 repository_fixture.restic_cli,
                 "execute",

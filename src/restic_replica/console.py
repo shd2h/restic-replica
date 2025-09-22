@@ -50,6 +50,18 @@ def setup_logging(
     logdir: Optional[Path] = None,
     debug: bool = False,
 ) -> logging.Logger:
+    """
+    Setup the application logger, a logging.Logger instance. Configures logging to
+    stdout, and optionally to file.
+
+    Args:
+        logger: the logging.Logger instance to configure.
+        logdir: an optional path to a directory where a log file will be written.
+        debug: boolean that sets the logging level to debug when True
+
+    Returns:
+        the configured Logger instance.
+    """
 
     # set debugging log level if specified
     if debug:
@@ -87,6 +99,12 @@ def setup_logging(
 
 
 def logging_headers(version: str) -> None:
+    """
+    Write the application headers to the application logger.
+
+    Args:
+        version: The application version.
+    """
     logger.info("==============================")
     logger.info(f"  restic-replica {version}")
     logger.info("==============================")

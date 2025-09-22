@@ -25,7 +25,21 @@ class ResticCli:
     verbose: Optional[int] = 0
 
     def _execute_live_output(self, arguments: list[str]) -> subprocess.CompletedProcess:
-        """Execute the command "arguments" and write stdout/stderr from the command to logger."""
+        """
+        Execute the command "arguments" and write stdout/stderr from the command to logger.
+        Output will be writen out "line by line" as the process emits it.
+
+        Args:
+            arguments: the commandline arguments to be executed
+
+        Returns:
+           a subprocess.CompletedProcess object containing the exit code, stdout and
+                stderr of the command.
+
+        Raises:
+            subprocess.CalledProcessError: raised if the command fails with an exit code
+                that is not 0 or 3.
+        """
         # use Popen instead of run to get "live" output
         with subprocess.Popen(
             arguments,
@@ -68,9 +82,10 @@ class ResticCli:
     ) -> subprocess.CompletedProcess:
         """
         Run the restic process with the provided commandline arguments.
-        - If live_output, restic will write stdout/stderr to logger while the restic
-        process is running.
         - If not live_output, stdout/stderr are captured and returned in a
+        CompletedProcess instance after the restic process exits.
+        - If live_output, stdout/stderr are written line-by-line to `logger` while the
+        restic process is running, as well as being captured and returned in a
         CompletedProcess instance after the restic process exits.
 
         Args:
@@ -81,7 +96,8 @@ class ResticCli:
             json: whether restic should emit output in json format.
 
         Returns:
-           subprocess.CompletedProcess: the completed restic process
+           a subprocess.CompletedProcess object containing the exit code, stdout and
+                stderr of the command.
         """
         # ensure no mutation of mutable arguments
         local_args = copy.copy(arguments)
@@ -180,11 +196,21 @@ class Repository:
         return ["-r", f"{self.uri}"]
 
     def _verify_password_is_set(self) -> bool:
-        """Assert that the password options supplied are valid"""
-        # Attempt to mimic restics behaviour here, in that:
-        # - password_file or password_command overwrite password
-        # - password_file and password_command are mutually exclusive
+        """
+        Assert that the password options supplied are valid. The behaviour of the restic
+        program is mimiced here, in that:
+        - password_file or password_command will overwrite password if set.
+        - password_file and password_command are mutually exclusive; an error is raised
+            if both are set.
 
+        Returns:
+            true if the options are valid.
+
+        Raises:
+            ValueError: raised if neither password, password_file or password_command
+                are set.
+            KeyError: raised if both password_file and password_command are set.
+        """
         # check at least one password* option was supplied
         if not (self.password or self.password_file or self.password_command):
             raise ValueError(
@@ -207,7 +233,17 @@ class Repository:
     def snapshots(
         self, live_output: bool = False, json: bool = False
     ) -> subprocess.CompletedProcess:
-        """list the snapshots stored in this repository"""
+        """
+        List the snapshots stored in this repository.
+
+        Args:
+            live_output: emit restic program output line-by-line
+            json: set restic program output mode to json
+
+        Returns:
+           a subprocess.CompletedProcess object containing the exit code, stdout and
+                stderr of the command.
+        """
 
         # execute restic CLI with the snapshots argument
         args = self._common_args()
@@ -222,7 +258,22 @@ class Repository:
     def copy(
         self, other: Self, live_output: bool = False, json: bool = False
     ) -> subprocess.CompletedProcess:
-        """copy snapshots from other repository to this repository"""
+        """
+        Copy snapshots from other repository to this repository.
+
+        Args:
+            other: respository to copy snapshots from
+            live_output: emit restic program output line-by-line
+            json: set restic program output mode to json
+
+        Returns:
+           a subprocess.CompletedProcess object containing the exit code, stdout and
+                stderr of the command.
+
+        Raises:
+            RuntimeError: raised if both source and destination repository are the same
+                repository.
+        """
 
         # prevent copying to/from the same repository
         if other.uri == self.uri:
