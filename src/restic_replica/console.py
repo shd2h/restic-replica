@@ -1,7 +1,11 @@
+import argparse
 from datetime import datetime
 import logging
 from pathlib import Path
+import sys
 from typing import Optional
+
+from restic_replica import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +22,24 @@ class NoInfo(logging.Filter):
 
     def filter(self, record):
         return record.levelno != logging.INFO
+
+
+def parse_cli_args(argv: list[str] = sys.argv[1:]) -> argparse.Namespace:
+    """
+    Process arguments provided via cli
+
+    Returns:
+        args: Simple object used for storing key/value attribute pairs
+    """
+    about = "Copy snapshots from one restic repository to another"
+    parser = argparse.ArgumentParser(prog="restic-replica", description=about)
+    parser.add_argument(
+        "--version", action="version", version=f"%(prog)s {__version__}"
+    )
+    parser.add_argument(
+        "-v", "--verbose", help="provide more detailed output", action="store_true"
+    )
+    return parser.parse_args(argv)
 
 
 def setup_logging(
