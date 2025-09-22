@@ -36,7 +36,11 @@ def parse_cli_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         "--version", action="version", version=f"%(prog)s {__version__}"
     )
     parser.add_argument(
-        "-v", "--verbose", help="provide more detailed output", action="store_true"
+        "-v",
+        "--verbose",
+        help="make restic output more verbose (specify multiple times, max level/times is 2)",
+        action="count",
+        default=0,
     )
     return parser.parse_args(argv)
 

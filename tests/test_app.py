@@ -156,6 +156,10 @@ class TestGetRestic:
                 Path("restic.exe"), {"RESTIC_PROGRESS_FPS": "0.016667"}
             )
 
+    def test_verbose(self):
+        """A supplied verbosity level should be should be included in the returned class instance"""
+        assert app.get_restic({}, verbose=2).verbose == 2
+
     def test_path(self):
         """A supplied restic path should be included in the returned class instance"""
         config = {"path": "/usr/local/bin/restic"}

@@ -59,9 +59,9 @@ class TestParseCliArgs:
 
     def test_verbose(self):
         """should set verbose boolean"""
-        assert console.parse_cli_args([]).verbose is False
-        assert console.parse_cli_args(["-v"]).verbose is True
-        assert console.parse_cli_args(["--verbose"]).verbose is True
+        assert console.parse_cli_args([]).verbose == 0
+        assert console.parse_cli_args(["-v"]).verbose == 1
+        assert console.parse_cli_args(["--verbose"]).verbose == 1
 
 
 class TestSetupLogging:

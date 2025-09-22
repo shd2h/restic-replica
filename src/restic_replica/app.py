@@ -83,7 +83,7 @@ def get_logdir(config: dict) -> Optional[Path]:
             return Path.home() / ".restic-replica"
 
 
-def get_restic(config: dict) -> ResticCli:
+def get_restic(config: dict, verbose: Optional[int] = 0) -> ResticCli:
     """return a ResticCli instance populated with the information from config"""
     # if the restic path is not specified, set it
     try:
@@ -101,7 +101,7 @@ def get_restic(config: dict) -> ResticCli:
     # set RESTIC_PROGRESS_FPS if it isn't set
     if "RESTIC_PROGRESS_FPS" not in env.keys():
         env["RESTIC_PROGRESS_FPS"] = "0.016667"  # update every minute
-    return ResticCli(path, environment_vars=env)
+    return ResticCli(path, environment_vars=env, verbose=verbose)
 
 
 def get_repository(name: str, config: dict, restic_cli: ResticCli) -> Repository:
