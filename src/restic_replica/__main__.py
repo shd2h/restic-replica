@@ -1,7 +1,10 @@
+import sys
+
 from restic_replica import __version__, app, console
 
 
-def main():
+def main(argv=sys.argv[1:]):
+    args = console.parse_cli_args(argv)
     config_file = app.ensure_config_file()
     config = app.read_config_file(config_file)
     logger = console.setup_logging(logdir=app.get_logdir(config))

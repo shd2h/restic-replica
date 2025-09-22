@@ -2,7 +2,6 @@ import argparse
 from datetime import datetime
 import logging
 from pathlib import Path
-import sys
 from typing import Optional
 
 from restic_replica import __version__
@@ -24,7 +23,7 @@ class NoInfo(logging.Filter):
         return record.levelno != logging.INFO
 
 
-def parse_cli_args(argv: list[str] = sys.argv[1:]) -> argparse.Namespace:
+def parse_cli_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     """
     Process arguments provided via cli
 
