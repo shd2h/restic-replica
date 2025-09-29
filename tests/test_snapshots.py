@@ -9,12 +9,13 @@ from tests.utils import new_snapshot
 
 
 class TestSnapshot:
-    """Tests for the class repository.Snapshot"""
+    """Tests for the class snapshots.Snapshot"""
 
     class TestFromDict:
         """Tests for the from_dict method"""
 
         def test_no_optionals(self):
+            """valid snapshot should be returned if no optional parameters are specified"""
             data = {
                 "time": "2025-09-22T15:19:14.968650111+01:00",
                 "tree": "a9c65ce7565f9e7456606dd0119ab186ba5aefc6fb883f433e7a6b406c0f6771",
@@ -52,6 +53,7 @@ class TestSnapshot:
 
         @pytest.mark.usefixtures("snapshot_fixture")
         def test_with_optionals(self, snapshot_fixture):
+            """valid snapshot should be returned if any optional parameters are specified"""
             data = {
                 "time": "2025-09-22T15:19:14.968650111+01:00",
                 "parent": "ef699e0b81670666e639c0271b09edc6b4e3158277e3dd1c0d72809b44c468f1",
@@ -88,13 +90,14 @@ class TestSnapshot:
 
 
 class TestSnapshotList:
-    """Tests for the class repository.SnapshotList"""
+    """Tests for the class snapshots.SnapshotList"""
 
     class TestFromJson:
         """Tests for the from_json method"""
 
         @pytest.mark.usefixtures("snapshot_fixture")
         def test_ingest(self, snapshot_fixture):
+            """json should be parsed and return valid snapshotlist and snapshot instances"""
             data = textwrap.dedent(
                 # fmt: off
                 "["
@@ -138,6 +141,7 @@ class TestSnapshotList:
             ]
 
         def test_null_ingest(self):
+            """empty json data should return an empty snapshotlist instance"""
             data = "[]"
             assert snapshots.SnapshotList.from_json(data).snapshots == []
 
@@ -146,6 +150,7 @@ class TestSnapshotList:
 
         @pytest.mark.usefixtures("snapshot_list_fixture")
         def test_sort_ascending(self, snapshot_list_fixture):
+            """snapshots should be sorted by date ascending"""
             random.shuffle(snapshot_list_fixture.snapshots)
             sorted = snapshot_list_fixture.time_sorted(descending=False)
             for i, snap in enumerate(sorted):
@@ -153,6 +158,7 @@ class TestSnapshotList:
                     assert snap.time > sorted[i - 1].time
 
         def test_sort_descending(self, snapshot_list_fixture):
+            """snapshots should be sorted by date descending"""
             random.shuffle(snapshot_list_fixture.snapshots)
             sorted = snapshot_list_fixture.time_sorted(descending=True)
             for i, snap in enumerate(sorted):
