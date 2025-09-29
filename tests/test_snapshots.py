@@ -1,3 +1,4 @@
+from contextlib import nullcontext as does_not_raise
 import datetime
 import pytest
 import random
@@ -6,6 +7,26 @@ from unittest import mock
 
 from restic_replica import snapshots
 from tests.utils import new_snapshot
+
+
+class TestPolicy:
+    """Tests for the class repository.Policy"""
+
+    class TestPostInit:
+        """Tests for the __post_init__ method"""
+
+        @pytest.mark.parametrize(
+            "arg, expectation",
+            [
+                (1, does_not_raise()),
+                (0, does_not_raise()),
+                (-1, pytest.raises(ValueError)),
+                ("foo", pytest.raises(TypeError)),
+            ],
+        )
+        def test_positive_int_only(self, arg, expectation):
+            with expectation:
+                snapshots.Policy(arg)
 
 
 class TestSnapshot:

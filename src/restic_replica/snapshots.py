@@ -17,13 +17,18 @@ class Policy:
     which have one or more snapshots.
     """
 
-    # do we need to assert these as positive?
-    # what does a no-op filter look like?
     last: int = 0
     daily: int = 0
     weekly: int = 0
     monthly: int = 0
     yearly: int = 0
+
+    def __post_init__(self):
+        for key in self.__dict__:
+            if not isinstance(self.__dict__[key], int):
+                raise TypeError(f"{key} must be an integer")
+            if self.__dict__[key] < 0:
+                raise ValueError(f"{key} must be non-negative")
 
 
 @dataclass
