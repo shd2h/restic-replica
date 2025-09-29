@@ -6,6 +6,8 @@ from pathlib import Path
 import subprocess
 from typing import Optional, Self
 
+from restic_replica.snapshots import SnapshotList
+
 logger = logging.getLogger(__name__)
 
 
@@ -256,7 +258,11 @@ class Repository:
         )
 
     def copy(
-        self, other: Self, live_output: bool = False, json: bool = False
+        self,
+        other: Self,
+        live_output: bool = False,
+        json: bool = False,
+        snapshots: Optional[SnapshotList] = None,
     ) -> subprocess.CompletedProcess:
         """
         Copy snapshots from other repository to this repository.
@@ -265,6 +271,7 @@ class Repository:
             other: respository to copy snapshots from
             live_output: emit restic program output line-by-line
             json: set restic program output mode to json
+            snapshots: SnapshotList defining which snapshots to copy. If None, all snapshots will be copied.
 
         Returns:
            a subprocess.CompletedProcess object containing the exit code, stdout and
@@ -292,6 +299,12 @@ class Repository:
         # execute restic CLI with the copy and other repository argument
         args = self._common_args()
         args.extend(["copy", "--from-repo", other.uri])
+
+        # extend copy with list of snapshots
+        if snapshots:
+            for snapshot in snapshots.snapshots:
+                args.append(snapshot.id)
+
         return self.restic_cli.execute(
             args,
             environment_vars=self.environment_vars,
