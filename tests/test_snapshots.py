@@ -19,7 +19,7 @@ class TestPolicy:
             "arg, expectation",
             [
                 (1, does_not_raise()),
-                (0, does_not_raise()),
+                (0, pytest.raises(ValueError)),
                 (-1, pytest.raises(ValueError)),
                 ("foo", pytest.raises(TypeError)),
             ],
@@ -191,9 +191,12 @@ class TestSnapshotList:
 
         @pytest.mark.usefixtures("snapshot_list_fixture")
         def test_no_snapshots(self, snapshot_list_fixture):
-            """an all zero policy should return no snapshots"""
+            """if no filters return any snapshots, then no snapshots should be returned"""
             # snapshot_list_fixture has 10 snapshots
-            policy = snapshots.Policy(0, 0, 0, 0, 0)
+            # set a policy that will return nothing
+            policy = snapshots.Policy(1, 0, 0, 0, 0)
+            # set "last" to zero after init, to avoid triggering "all zeroes not allowed" check
+            policy.last = 0
             assert snapshot_list_fixture.filter(policy) == []
 
         @pytest.mark.usefixtures("snapshot_list_fixture")

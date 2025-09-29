@@ -28,7 +28,9 @@ class Policy:
             if not isinstance(self.__dict__[key], int):
                 raise TypeError(f"{key} must be an integer")
             if self.__dict__[key] < 0:
-                raise ValueError(f"{key} must be non-negative")
+                raise ValueError(f"{key} must be a non-negative integer")
+        if sum(self.__dict__.values()) == 0:
+            raise ValueError("Policy must contain at least one non-zero rule")
 
 
 @dataclass
