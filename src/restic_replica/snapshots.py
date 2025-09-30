@@ -83,6 +83,9 @@ class SnapshotList:
 
     snapshots: list[Snapshot]
 
+    def __str__(self):
+        return ", ".join([snap.short_id for snap in self.snapshots])
+
     @classmethod
     def from_json(cls, data):
         snap_list = []

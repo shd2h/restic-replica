@@ -133,6 +133,16 @@ class TestSnapshot:
 class TestSnapshotList:
     """Tests for the class snapshots.SnapshotList"""
 
+    class TestStr:
+        """Tests for the __str__ method"""
+
+        @pytest.mark.usefixtures("snapshot_list_fixture")
+        def test_output(self, snapshot_list_fixture):
+            """output should be a list of snapshot short_ids"""
+            assert [x.strip() for x in str(snapshot_list_fixture).split(",")] == [
+                s.short_id for s in snapshot_list_fixture.snapshots
+            ]
+
     class TestFromJson:
         """Tests for the from_json method"""
 
