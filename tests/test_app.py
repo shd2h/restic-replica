@@ -340,6 +340,10 @@ class TestGetFilteredSnapshots:
 class TestCopySnapshots:
     """Tests for the function app.copy_snapshots"""
 
+    def return_kwargs(self, *args, **kwargs):
+        """function that returns all kwargs passed to it"""
+        return kwargs
+
     @pytest.mark.usefixtures("repository_fixture", "restic_cli_fixture")
     def test_copy_success(self, repository_fixture, restic_cli_fixture):
         """Should return true if the copy operation is successful"""
@@ -398,3 +402,42 @@ class TestCopySnapshots:
                         password="secret2",
                     ),
                 )
+
+    @pytest.mark.usefixtures(
+        "repository_fixture", "restic_cli_fixture", "snapshot_list_fixture"
+    )
+    def test_snapshot_list(
+        self, repository_fixture, restic_cli_fixture, snapshot_list_fixture
+    ):
+        """A SnapshotList object should be passed if a policy is provided"""
+        with mock.patch.object(repository_fixture, "copy", self.return_kwargs):
+            with mock.patch(
+                "restic_replica.app.get_filtered_snapshots",
+                return_value=snapshot_list_fixture,
+            ):
+                result = app.copy_snapshots(
+                    Repository(
+                        "/tmp/restic-repo2",
+                        "myrepo2",
+                        restic_cli_fixture,
+                        password="secret2",
+                    ),
+                    repository_fixture,
+                    policy=Policy(1),
+                )
+                assert result["snapshots"] == snapshot_list_fixture
+
+    @pytest.mark.usefixtures("repository_fixture", "restic_cli_fixture")
+    def test_no_snapshot_list(self, repository_fixture, restic_cli_fixture):
+        """A SnapshotList object should not be passed if a policy is not provided"""
+        with mock.patch.object(repository_fixture, "copy", self.return_kwargs):
+            result = app.copy_snapshots(
+                Repository(
+                    "/tmp/restic-repo2",
+                    "myrepo2",
+                    restic_cli_fixture,
+                    password="secret2",
+                ),
+                repository_fixture,
+            )
+            assert "snapshots" not in result.keys()

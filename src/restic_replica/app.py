@@ -199,10 +199,17 @@ def get_filtered_snapshots(repository: Repository, policy: Policy) -> SnapshotLi
 
 
 def copy_snapshots(
-    source_repository: Repository, destination_repository: Repository
+    source_repository: Repository,
+    destination_repository: Repository,
+    policy: Optional[Policy] = None,
 ) -> CompletedProcess:
     """
     Copy snapshots from source_repository repository to destination_repository
+
+    Args:
+        source_repository: the Repository instance snapshots will be copied _from_
+        destination_repository: the Repository instance snapshots will be copied _to_
+        policy: an optional Policy instance that will be applied to filter the list of snapshots that will be copied
 
     Returns:
         a populated CompletedProcess instance
@@ -211,7 +218,14 @@ def copy_snapshots(
         RunTimeError: raised if operation fails
     """
     try:
-        return destination_repository.copy(source_repository, live_output=True)
+        if policy:
+            return destination_repository.copy(
+                source_repository,
+                live_output=True,
+                snapshots=get_filtered_snapshots(source_repository, policy),
+            )
+        else:
+            return destination_repository.copy(source_repository, live_output=True)
     except (CalledProcessError, OSError) as err:
         logger.error(err)
         raise RuntimeError(
