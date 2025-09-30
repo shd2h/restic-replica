@@ -200,6 +200,50 @@ class TestGetRestic:
         }
 
 
+class TestGetPolicy:
+    """Tests for the function app.get_policy"""
+
+    def test_no_policy(self):
+        """an empty dictionary (i.e. the user set no policy options) should return None"""
+        assert app.get_policy({}) is None
+
+    @pytest.mark.parametrize(
+        "policy, expectation",
+        [
+            ({"keep-last": 10}, Policy(10, 0, 0, 0, 0)),
+            ({"keep-daily": 10}, Policy(0, 10, 0, 0, 0)),
+            ({"keep-weekly": 10}, Policy(0, 0, 10, 0, 0)),
+            ({"keep-monthly": 10}, Policy(0, 0, 0, 10, 0)),
+            ({"keep-yearly": 10}, Policy(0, 0, 0, 0, 10)),
+        ],
+    )
+    def test_policy_options(self, policy, expectation):
+        """one or more policy options should return a Policy instance, with any unset options set to 0 (disabled)"""
+        assert app.get_policy(policy) == expectation
+
+    def test_all_policy_options(self):
+        """all policy options should be able to be set at once"""
+        assert app.get_policy(
+            {
+                "keep-last": 10,
+                "keep-daily": 9,
+                "keep-weekly": 8,
+                "keep-monthly": 7,
+                "keep-yearly": 6,
+            }
+        ) == Policy(10, 9, 8, 7, 6)
+
+    def test_non_integer_input(self):
+        """an invalid policy input (i.e. not-an-integer, or a negative integer) should raise a RuntimeError"""
+        with pytest.raises(RuntimeError):
+            app.get_policy({"keep-last": "foo"})
+
+    def test_invalid_policy(self):
+        """inputs that would lead to an invalid policy (i.e. all zeroes) should raise a RuntimeError"""
+        with pytest.raises(RuntimeError):
+            app.get_policy({"keep-last": 0})
+
+
 class TestGetRepository:
     """Tests for the function app.get_repository"""
 

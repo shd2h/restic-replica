@@ -129,6 +129,58 @@ def get_restic(config: dict, verbose: Optional[int] = 0) -> ResticCli:
     return ResticCli(path, environment_vars=env, verbose=verbose)
 
 
+def get_policy(config: dict) -> Optional[Policy]:
+    """
+    Return a Policy instance populated with the information from config
+
+    Args:
+        config: policy configuration dictionary
+
+    Returns:
+        a populated Policy instance
+
+    Raises:
+        RuntimeError: raised if the policy is invalid, or invalid policy options are read from the config.
+    """
+    user_set_policy = False
+    try:
+        keep_last = config["keep-last"]
+        user_set_policy = True
+    except KeyError:
+        keep_last = 0
+    try:
+        keep_daily = config["keep-daily"]
+        user_set_policy = True
+    except KeyError:
+        keep_daily = 0
+    try:
+        keep_weekly = config["keep-weekly"]
+        user_set_policy = True
+    except KeyError:
+        keep_weekly = 0
+    try:
+        keep_monthly = config["keep-monthly"]
+        user_set_policy = True
+    except KeyError:
+        keep_monthly = 0
+    try:
+        keep_yearly = config["keep-yearly"]
+        user_set_policy = True
+    except KeyError:
+        keep_yearly = 0
+
+    # if user set any values, return a policy, else return none
+    if user_set_policy:
+        try:
+            return Policy(keep_last, keep_daily, keep_weekly, keep_monthly, keep_yearly)
+        except (ValueError, TypeError) as err:
+            raise RuntimeError(
+                "Invalid policy; all keep-* options set in the config file must be non-negative integers, and at least one must be non-zero."
+            ) from err
+    else:
+        return None
+
+
 def get_repository(name: str, config: dict, restic_cli: ResticCli) -> Repository:
     """
     Return a Repository instance populated with the information from config
