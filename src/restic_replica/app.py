@@ -175,6 +175,9 @@ def check_repository_access(repository: Repository) -> bool:
     """
     Verify that a repository can be accessed successfully
 
+    Args:
+        repository: the Repository instance to check access for
+
     Returns:
         a boolean indicating operation success
 
