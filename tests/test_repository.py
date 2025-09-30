@@ -354,7 +354,6 @@ class TestRepository:
             return kwargs
 
         @pytest.fixture
-        @pytest.mark.usefixtures("restic_cli_fixture")
         def other_repository_fixture(self, restic_cli_fixture):
             """Return a (:class:`repository.Repository`) instance"""
             return repository.Repository(
