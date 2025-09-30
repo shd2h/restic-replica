@@ -32,6 +32,20 @@ class Policy:
         if sum(self.__dict__.values()) == 0:
             raise ValueError("Policy must contain at least one non-zero rule")
 
+    def __str__(self):
+        output = []
+        if self.last > 0:
+            output.append(f"keep-last={self.last}")
+        if self.daily > 0:
+            output.append(f"keep-daily={self.daily}")
+        if self.weekly > 0:
+            output.append(f"keep-weekly={self.weekly}")
+        if self.monthly > 0:
+            output.append(f"keep-monthly={self.monthly}")
+        if self.yearly > 0:
+            output.append(f"keep-yearly={self.yearly}")
+        return ", ".join(output)
+
 
 @dataclass
 class Snapshot:
