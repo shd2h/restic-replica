@@ -42,6 +42,11 @@ def parse_cli_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         action="count",
         default=0,
     )
+    parser.add_argument(
+        "--dry-run",
+        help="do not actually copy any snapshots, print what would be done",
+        action="store_true",
+    )
     return parser.parse_args(argv)
 
 

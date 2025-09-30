@@ -58,10 +58,15 @@ class TestParseCliArgs:
         assert captured.out.strip() == f"restic-replica {__version__}"
 
     def test_verbose(self):
-        """should set verbose boolean"""
+        """should set verbosity level"""
         assert console.parse_cli_args([]).verbose == 0
         assert console.parse_cli_args(["-v"]).verbose == 1
         assert console.parse_cli_args(["--verbose"]).verbose == 1
+
+    def test_dry_run(self):
+        """should set dry_run boolean"""
+        assert console.parse_cli_args([]).dry_run is False
+        assert console.parse_cli_args(["--dry-run"]).dry_run is True
 
 
 class TestSetupLogging:
