@@ -354,7 +354,6 @@ class TestRepository:
             return kwargs
 
         @pytest.fixture
-        @pytest.mark.usefixtures("restic_cli_fixture")
         def other_repository_fixture(self, restic_cli_fixture):
             """Return a (:class:`repository.Repository`) instance"""
             return repository.Repository(
@@ -369,7 +368,7 @@ class TestRepository:
 
         @pytest.mark.usefixtures("repository_fixture", "other_repository_fixture")
         def test_args(self, repository_fixture, other_repository_fixture):
-            """args should include _common_args and have `copy` and second repository appended"""
+            """args should include _common_args and have `copy` and second repository appended. No snapshot IDs should be supplied"""
             with mock.patch.object(
                 repository_fixture.restic_cli,
                 "execute",
@@ -484,4 +483,25 @@ class TestRepository:
                 assert (
                     repository_fixture.copy(other_repository_fixture, json=True)["json"]
                     is True
+                )
+
+        @pytest.mark.usefixtures(
+            "repository_fixture", "other_repository_fixture", "snapshot_list_fixture"
+        )
+        def test_copy_snapshotlist(
+            self, repository_fixture, other_repository_fixture, snapshot_list_fixture
+        ):
+            """supplying a snapshot list should result in all snapshot IDs being appended to args"""
+
+            expected_ids = [i.id for i in snapshot_list_fixture.snapshots]
+            with mock.patch.object(
+                repository_fixture.restic_cli,
+                "execute",
+                self.return_args,
+            ):
+                assert repository_fixture.copy(
+                    other_repository_fixture, snapshots=snapshot_list_fixture
+                ) == (
+                    ["-r", "/tmp/restic-repo", "copy", "--from-repo", "/tmp/repo2"]
+                    + expected_ids,
                 )

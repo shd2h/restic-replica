@@ -13,6 +13,16 @@
 # RESTIC_PROGRESS_FPS = '0.003333'
 
 
+[policy]
+## Snapshot filtering options used by the copy command
+## If none of the "keep-*" options below are set/uncommented, all snapshots will be copied.
+# keep-last = 24
+# keep-daily = 30
+# keep-weekly = 8
+# keep-monthly = 6
+# keep-yearly = 2
+
+
 [source]
 ## Location of the source restic repository, where snapshots will be copied *from*. 
 ## This needs to be initialised in advance, but supports all of the restic repository types detailed here:

@@ -9,6 +9,7 @@ from typing import Optional
 
 from restic_replica import __assets__
 from restic_replica.repository import Repository, ResticCli
+from restic_replica.snapshots import Policy, SnapshotList
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +129,58 @@ def get_restic(config: dict, verbose: Optional[int] = 0) -> ResticCli:
     return ResticCli(path, environment_vars=env, verbose=verbose)
 
 
+def get_policy(config: dict) -> Optional[Policy]:
+    """
+    Return a Policy instance populated with the information from config
+
+    Args:
+        config: policy configuration dictionary
+
+    Returns:
+        a populated Policy instance
+
+    Raises:
+        RuntimeError: raised if the policy is invalid, or invalid policy options are read from the config.
+    """
+    user_set_policy = False
+    try:
+        keep_last = config["keep-last"]
+        user_set_policy = True
+    except KeyError:
+        keep_last = 0
+    try:
+        keep_daily = config["keep-daily"]
+        user_set_policy = True
+    except KeyError:
+        keep_daily = 0
+    try:
+        keep_weekly = config["keep-weekly"]
+        user_set_policy = True
+    except KeyError:
+        keep_weekly = 0
+    try:
+        keep_monthly = config["keep-monthly"]
+        user_set_policy = True
+    except KeyError:
+        keep_monthly = 0
+    try:
+        keep_yearly = config["keep-yearly"]
+        user_set_policy = True
+    except KeyError:
+        keep_yearly = 0
+
+    # if user set any values, return a policy, else return none
+    if user_set_policy:
+        try:
+            return Policy(keep_last, keep_daily, keep_weekly, keep_monthly, keep_yearly)
+        except (ValueError, TypeError) as err:
+            raise RuntimeError(
+                "Invalid policy; all keep-* options set in the config file must be non-negative integers, and at least one must be non-zero."
+            ) from err
+    else:
+        return None
+
+
 def get_repository(name: str, config: dict, restic_cli: ResticCli) -> Repository:
     """
     Return a Repository instance populated with the information from config
@@ -174,6 +227,9 @@ def check_repository_access(repository: Repository) -> bool:
     """
     Verify that a repository can be accessed successfully
 
+    Args:
+        repository: the Repository instance to check access for
+
     Returns:
         a boolean indicating operation success
 
@@ -187,11 +243,28 @@ def check_repository_access(repository: Repository) -> bool:
         raise RuntimeError(f"Unable to access restic repository {repository}") from err
 
 
+def get_filtered_snapshots(repository: Repository, policy: Policy) -> SnapshotList:
+    """"""
+    snaps = SnapshotList.from_json(repository.snapshots(json=True).stdout)
+    filtered_snaps = SnapshotList(snaps.filter(policy))
+    if len(filtered_snaps.snapshots) > 0:
+        return filtered_snaps
+    else:
+        raise RuntimeError("snapshot filtering led to 0 snapshots to copy")
+
+
 def copy_snapshots(
-    source_repository: Repository, destination_repository: Repository
+    source_repository: Repository,
+    destination_repository: Repository,
+    policy: Optional[Policy] = None,
 ) -> CompletedProcess:
     """
     Copy snapshots from source_repository repository to destination_repository
+
+    Args:
+        source_repository: the Repository instance snapshots will be copied _from_
+        destination_repository: the Repository instance snapshots will be copied _to_
+        policy: an optional Policy instance that will be applied to filter the list of snapshots that will be copied
 
     Returns:
         a populated CompletedProcess instance
@@ -200,7 +273,14 @@ def copy_snapshots(
         RunTimeError: raised if operation fails
     """
     try:
-        return destination_repository.copy(source_repository, live_output=True)
+        if policy:
+            return destination_repository.copy(
+                source_repository,
+                live_output=True,
+                snapshots=get_filtered_snapshots(source_repository, policy),
+            )
+        else:
+            return destination_repository.copy(source_repository, live_output=True)
     except (CalledProcessError, OSError) as err:
         logger.error(err)
         raise RuntimeError(
