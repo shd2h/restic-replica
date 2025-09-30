@@ -8,6 +8,7 @@ from unittest import mock
 
 from restic_replica import __assets__, app
 from restic_replica.repository import Repository, ResticCli
+from restic_replica.snapshots import Policy
 
 
 class TestEnsureConfigFile:
@@ -289,6 +290,51 @@ class TestCheckRepositoryAccess:
         ):
             with pytest.raises(RuntimeError):
                 app.check_repository_access(repository_fixture)
+
+
+class TestGetFilteredSnapshots:
+    """Tests for the function app.get_filtered_snapshots"""
+
+    def test_some_snapshots(
+        self, repository_fixture, snapshot_list_fixture, snapshot_fixture, monkeypatch
+    ):
+        """if filter returns some snapshots a SnapshotList instance should be returned"""
+        monkeypatch.setattr(
+            repository_fixture,
+            "snapshots",
+            lambda *args, **kwargs: CompletedProcess(["./foo"], 0, None),
+        )
+        monkeypatch.setattr(
+            "restic_replica.snapshots.SnapshotList.from_json",
+            lambda *args, **kwargs: snapshot_list_fixture,
+        )
+        monkeypatch.setattr(
+            "restic_replica.snapshots.SnapshotList.filter",
+            lambda *args, **kwargs: [snapshot_fixture],
+        )
+        assert app.get_filtered_snapshots(repository_fixture, Policy(1)).snapshots == [
+            snapshot_fixture
+        ]
+
+    def test_no_snapshots(
+        self, repository_fixture, snapshot_list_fixture, snapshot_fixture, monkeypatch
+    ):
+        """if filter returns no snapshots a RuntimeError should be raised"""
+        monkeypatch.setattr(
+            repository_fixture,
+            "snapshots",
+            lambda *args, **kwargs: CompletedProcess(["./foo"], 0, None),
+        )
+        monkeypatch.setattr(
+            "restic_replica.snapshots.SnapshotList.from_json",
+            lambda *args, **kwargs: snapshot_list_fixture,
+        )
+        monkeypatch.setattr(
+            "restic_replica.snapshots.SnapshotList.filter",
+            lambda *args, **kwargs: [],
+        )
+        with pytest.raises(RuntimeError):
+            app.get_filtered_snapshots(repository_fixture, Policy(1)).snapshots
 
 
 class TestCopySnapshots:

@@ -9,6 +9,7 @@ from typing import Optional
 
 from restic_replica import __assets__
 from restic_replica.repository import Repository, ResticCli
+from restic_replica.snapshots import Policy, SnapshotList
 
 logger = logging.getLogger(__name__)
 
@@ -185,6 +186,16 @@ def check_repository_access(repository: Repository) -> bool:
     except (CalledProcessError, OSError) as err:
         logger.error(err)
         raise RuntimeError(f"Unable to access restic repository {repository}") from err
+
+
+def get_filtered_snapshots(repository: Repository, policy: Policy) -> SnapshotList:
+    """"""
+    snaps = SnapshotList.from_json(repository.snapshots(json=True).stdout)
+    filtered_snaps = SnapshotList(snaps.filter(policy))
+    if len(filtered_snaps.snapshots) > 0:
+        return filtered_snaps
+    else:
+        raise RuntimeError("snapshot filtering led to 0 snapshots to copy")
 
 
 def copy_snapshots(
