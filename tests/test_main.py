@@ -96,7 +96,7 @@ class TestMain:
         """A successful copy should log an informational message"""
         caplog.set_level(logging.INFO)
         __main__.main([])
-        assert caplog.records[3].message == "Finished copying snapshots"
+        assert caplog.records[2].message == "Finished copying snapshots"
 
     @mock.patch(
         "restic_replica.app.copy_snapshots",
@@ -109,7 +109,7 @@ class TestMain:
         caplog.set_level(logging.INFO)
         __main__.main([])
         assert (
-            caplog.records[3].message
+            caplog.records[2].message
             == "All snapshots from the source are already present in the destination repository"
         )
 

@@ -28,6 +28,26 @@ class TestPolicy:
             with expectation:
                 snapshots.Policy(arg)
 
+    class TestStr:
+        """Tests for the __str__ method"""
+
+        @pytest.mark.parametrize(
+            "policy, expectation",
+            [
+                (snapshots.Policy(5, 0, 0, 0, 0), "keep-last=5"),
+                (snapshots.Policy(0, 4, 0, 0, 0), "keep-daily=4"),
+                (snapshots.Policy(0, 0, 3, 0, 0), "keep-weekly=3"),
+                (snapshots.Policy(0, 0, 0, 2, 0), "keep-monthly=2"),
+                (snapshots.Policy(0, 0, 0, 0, 1), "keep-yearly=1"),
+                (
+                    snapshots.Policy(5, 4, 3, 2, 1),
+                    "keep-last=5, keep-daily=4, keep-weekly=3, keep-monthly=2, keep-yearly=1",
+                ),
+            ],
+        )
+        def test_output(self, policy, expectation):
+            assert str(policy) == expectation
+
 
 class TestSnapshot:
     """Tests for the class snapshots.Snapshot"""
@@ -112,6 +132,16 @@ class TestSnapshot:
 
 class TestSnapshotList:
     """Tests for the class snapshots.SnapshotList"""
+
+    class TestStr:
+        """Tests for the __str__ method"""
+
+        @pytest.mark.usefixtures("snapshot_list_fixture")
+        def test_output(self, snapshot_list_fixture):
+            """output should be a list of snapshot short_ids"""
+            assert [x.strip() for x in str(snapshot_list_fixture).split(",")] == [
+                s.short_id for s in snapshot_list_fixture.snapshots
+            ]
 
     class TestFromJson:
         """Tests for the from_json method"""

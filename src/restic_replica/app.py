@@ -257,6 +257,7 @@ def copy_snapshots(
     source_repository: Repository,
     destination_repository: Repository,
     policy: Optional[Policy] = None,
+    dry_run: bool = False,
 ) -> CompletedProcess:
     """
     Copy snapshots from source_repository repository to destination_repository
@@ -265,22 +266,39 @@ def copy_snapshots(
         source_repository: the Repository instance snapshots will be copied _from_
         destination_repository: the Repository instance snapshots will be copied _to_
         policy: an optional Policy instance that will be applied to filter the list of snapshots that will be copied
+        dry_run: whether to actually perform the copy operation or not
 
     Returns:
         a populated CompletedProcess instance
 
     Raises:
         RunTimeError: raised if operation fails
+        SystemExit: raised instead of performing the copy process, if dry_run is set
     """
     try:
         if policy:
+            logger.info(
+                f"Filtering snapshots to be copied from source repository using policy: {policy}"
+            )
+            filtered_snapshots = get_filtered_snapshots(source_repository, policy)
+            logger.info(f"The following snapshots will be copied: {filtered_snapshots}")
+        else:
+            logger.info(
+                "No policy specified, all snapshots will be copied from the source repository"
+            )
+            filtered_snapshots = None
+        if dry_run:
+            logger.info("dry-run flag set, exiting without performing copy operation")
+            raise SystemExit(0)
+        else:
+            logger.info(
+                f"Starting copy of snapshots from {source_repository.uri} to {destination_repository.uri}"
+            )
             return destination_repository.copy(
                 source_repository,
                 live_output=True,
-                snapshots=get_filtered_snapshots(source_repository, policy),
+                snapshots=filtered_snapshots,
             )
-        else:
-            return destination_repository.copy(source_repository, live_output=True)
     except (CalledProcessError, OSError) as err:
         logger.error(err)
         raise RuntimeError(

@@ -18,13 +18,12 @@ def main(argv=sys.argv[1:]):
         source = app.get_repository("source", config["source"], restic_cli)
         destination = app.get_repository("target", config["destination"], restic_cli)
         # check access, then trigger copy
-        logger.info("Checking access to source repository")
+        logger.info(f"Checking access to source repository: {source.uri}")
         app.check_repository_access(source)
-        logger.info("Checking access to destination repository")
+        logger.info(f"Checking access to destination repository: {destination.uri}")
         app.check_repository_access(destination)
-        logger.info("Starting copy of snapshots from source to destination repository")
-        # I guess this is the logical place to add the filter.
-        result = app.copy_snapshots(source, destination, policy)
+        # perform snapshot copy operation
+        result = app.copy_snapshots(source, destination, policy, dry_run=args.dry_run)
         if not result.stdout:
             logger.info(
                 "All snapshots from the source are already present in the destination repository"
