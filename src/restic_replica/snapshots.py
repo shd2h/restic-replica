@@ -22,9 +22,13 @@ class Policy:
     weekly: int = 0
     monthly: int = 0
     yearly: int = 0
+    no_current: bool = False
 
     def __post_init__(self):
+        if self.no_current not in (True, False):
+            raise TypeError("exclude-current-period must be a boolean")
         for key in self.__dict__:
+            # NB: this doesn't blow up because bool is a subclass of int.
             if not isinstance(self.__dict__[key], int):
                 raise TypeError(f"{key} must be an integer")
             if self.__dict__[key] < 0:
@@ -44,6 +48,8 @@ class Policy:
             output.append(f"keep-monthly={self.monthly}")
         if self.yearly > 0:
             output.append(f"keep-yearly={self.yearly}")
+        if self.no_current:
+            output.append(f"exclude-current-period={self.no_current}")
         return ", ".join(output)
 
 

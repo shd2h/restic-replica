@@ -26,7 +26,28 @@ class TestPolicy:
         )
         def test_positive_int_only(self, arg, expectation):
             with expectation:
-                snapshots.Policy(arg)
+                snapshots.Policy(arg, 0, 0, 0, 0)
+                snapshots.Policy(0, arg, 0, 0, 0)
+                snapshots.Policy(0, 0, arg, 0, 0)
+                snapshots.Policy(0, 0, 0, arg, 0)
+                snapshots.Policy(0, 0, 0, 0, arg)
+
+        @pytest.mark.parametrize(
+            "arg, expectation",
+            [
+                (True, does_not_raise()),
+                (False, does_not_raise()),
+                (0, does_not_raise()),  # int 0 maps to False
+                (1, does_not_raise()),  # int 1 maps to True
+                (2, pytest.raises(TypeError)),  # int gt 1 does not resolve to bool
+                (-1, pytest.raises(TypeError)),  # int lt 0 does not resolve to bool
+                ("foo", pytest.raises(TypeError)),
+            ],
+        )
+        def test_no_current(self, arg, expectation):
+            """exclude-current-period should only accept a boolean (or a 0, or a 1, as those resolve to true/false)"""
+            with expectation:
+                snapshots.Policy(1, no_current=arg)
 
     class TestStr:
         """Tests for the __str__ method"""
@@ -42,6 +63,10 @@ class TestPolicy:
                 (
                     snapshots.Policy(5, 4, 3, 2, 1),
                     "keep-last=5, keep-daily=4, keep-weekly=3, keep-monthly=2, keep-yearly=1",
+                ),
+                (
+                    snapshots.Policy(5, 0, 0, 0, 0, True),
+                    "keep-last=5, exclude-current-period=True",
                 ),
             ],
         )
