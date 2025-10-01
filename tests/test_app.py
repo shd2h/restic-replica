@@ -484,4 +484,20 @@ class TestCopySnapshots:
                 ),
                 repository_fixture,
             )
-            assert "snapshots" not in result.keys()
+            assert result["snapshots"] is None
+
+    @pytest.mark.usefixtures("repository_fixture", "restic_cli_fixture")
+    def test_dry_run(self, repository_fixture, restic_cli_fixture):
+        """if the dry_run argument is passed, systemexit should be raised, and copy should not be called"""
+        with mock.patch.object(repository_fixture, "copy", side_effect=RuntimeError):
+            with pytest.raises(SystemExit):
+                app.copy_snapshots(
+                    Repository(
+                        "/tmp/restic-repo2",
+                        "myrepo2",
+                        restic_cli_fixture,
+                        password="secret2",
+                    ),
+                    repository_fixture,
+                    dry_run=True,
+                )
