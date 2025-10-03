@@ -11,6 +11,13 @@ from restic_replica import repository
 class TestResticCli:
     """Tests for the class repository.ResticCli"""
 
+    @pytest.fixture(autouse=True)
+    def mock_os_environ(self, monkeypatch):
+        monkeypatch.setattr(
+            "os.environ",
+            {},
+        )
+
     class TestExecuteLiveOutput:
         """Tests for the _execute_live_output method"""
 
@@ -105,21 +112,26 @@ class TestResticCli:
             assert process.args == args_with_restic
 
         @pytest.mark.usefixtures("restic_cli_fixture")
-        def test_class_env_vars(self, fp, restic_cli_fixture):
+        def test_class_env_vars(self, restic_cli_fixture, monkeypatch):
             """
             environment variables should be set, with the ResticCli fixture environment
             variables having primacy. The input ductionary should not be mutated.
             """
+
+            def return_environ(*args, **kwargs):
+                """function that returns a copy of the os.environment dictionary"""
+                return os.environ.copy()
+
             environment_vars = {
                 "RESTIC_PROGRESS_FPS": "60",
                 "RESTIC_PASSWORD": "secret",
             }
-            fp.register(["restic", "snapshots"], stdout=None)
-            restic_cli_fixture.execute(["snapshots"], environment_vars)
-            # existing variable should be set to class value
-            assert os.environ["RESTIC_PROGRESS_FPS"] == "0.016667"
-            # new variable should be updated
-            assert os.environ["RESTIC_PASSWORD"] == "secret"
+            monkeypatch.setattr("subprocess.run", return_environ)
+            process_env = restic_cli_fixture.execute(["snapshots"], environment_vars)
+            # variable already existing in class should be set to class value, not new value
+            assert process_env["RESTIC_PROGRESS_FPS"] == "0.016667"
+            # new variable should be added
+            assert process_env["RESTIC_PASSWORD"] == "secret"
             # original environment_vars dict should not be mutated
             assert environment_vars == {
                 "RESTIC_PROGRESS_FPS": "60",
