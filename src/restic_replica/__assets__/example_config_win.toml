@@ -43,7 +43,8 @@ password = 'secret'
 
 [source.environment]
 ## environment variables specific to the source repository
-# RESTIC_COMPRESSION = 'true'
+## Note: will be combined with destination.environment during copy operation
+# RESTIC_COMPRESSION = 'max'
 
 
 [destination]
@@ -72,4 +73,5 @@ password = 'secret'
 
 [destination.environment]
 ## environment variables specific to the destination repository
-# RESTIC_COMPRESSION = 'true'
+## Note: will be combined with destination.environment during copy operation
+# RESTIC_COMPRESSION = 'max'
