@@ -173,6 +173,14 @@ class TestResticCli:
                     == fake_return
                 )
 
+        @pytest.mark.usefixtures("restic_cli_fixture")
+        def test_environment_vars_unset(self, fp, restic_cli_fixture):
+            """any environment variables that are set should be unset"""
+            fp.register(["restic", "snapshots"])
+            restic_cli_fixture.execute(["snapshots"])
+            for key in restic_cli_fixture.environment_vars.keys():
+                assert os.getenv(f"{key}") is None
+
 
 class TestRepository:
     """Tests for the class repository.Repository"""

@@ -116,14 +116,23 @@ class ResticCli:
             local_args.append("--json")
         # set environment variables
         for key, value in local_env_vars.items():
-            os.environ[f"{key}"] = f"{value}"
+            os.environ[key] = value
 
-        if live_output:
-            return self._execute_live_output(local_args)
-        else:
-            return subprocess.run(
-                local_args, capture_output=True, check=True, encoding="UTF-8", text=True
-            )
+        try:
+            if live_output:
+                return self._execute_live_output(local_args)
+            else:
+                return subprocess.run(
+                    local_args,
+                    capture_output=True,
+                    check=True,
+                    encoding="UTF-8",
+                    text=True,
+                )
+        finally:
+            # unset all environment variables set previously
+            for key in local_env_vars.keys():
+                os.environ.pop(key, None)
 
 
 @dataclass
