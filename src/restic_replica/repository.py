@@ -116,14 +116,23 @@ class ResticCli:
             local_args.append("--json")
         # set environment variables
         for key, value in local_env_vars.items():
-            os.environ[f"{key}"] = f"{value}"
+            os.environ[key] = value
 
-        if live_output:
-            return self._execute_live_output(local_args)
-        else:
-            return subprocess.run(
-                local_args, capture_output=True, check=True, encoding="UTF-8", text=True
-            )
+        try:
+            if live_output:
+                return self._execute_live_output(local_args)
+            else:
+                return subprocess.run(
+                    local_args,
+                    capture_output=True,
+                    check=True,
+                    encoding="UTF-8",
+                    text=True,
+                )
+        finally:
+            # unset all environment variables set previously
+            for key in local_env_vars.keys():
+                os.environ.pop(key, None)
 
 
 @dataclass
@@ -232,6 +241,31 @@ class Repository:
             )
         return True
 
+    def _filter_other_env(self, pair) -> bool:
+        """
+        Return false for incompatible environment variables, i.e. variables that can be
+        combined with the environment variables of another Repository instance without
+        causing authentication issues due to namespace collision.
+
+        tldr; Filters out RESTIC_PASSWORD* env vars
+
+        Args:
+            pair: tuple consisting of dictionary key and value
+
+        Returns:
+            true to retain pair, false to discard
+        """
+        password_keys = [
+            "RESTIC_PASSWORD",
+            "RESTIC_PASSWORD_FILE",
+            "RESTIC_PASSWORD_COMMAND",
+        ]
+        key, _ = pair  # unpack the pair
+        if key in password_keys:
+            return False
+        else:
+            return True
+
     def snapshots(
         self, live_output: bool = False, json: bool = False
     ) -> subprocess.CompletedProcess:
@@ -286,15 +320,21 @@ class Repository:
         if other.uri == self.uri:
             raise RuntimeError("source and destination repository must be different")
 
+        # combine the environment variables from both repositories, giving primacy to our variables
+        # NB: this is necessary to inherit S3 credentials and the like
+        combined_env = dict(
+            filter(self._filter_other_env, other.environment_vars.items())
+        )
+        # add our environment variables, overwriting any that already existed
+        combined_env.update(self.environment_vars)
+
         # Set environment variables based on the password configuration of the other repository, in descending order of primacy
         if other.password_command:
-            self.environment_vars["RESTIC_FROM_PASSWORD_COMMAND"] = (
-                other.password_command
-            )
+            combined_env["RESTIC_FROM_PASSWORD_COMMAND"] = other.password_command
         elif other.password_file:
-            self.environment_vars["RESTIC_FROM_PASSWORD_FILE"] = other.password_file
+            combined_env["RESTIC_FROM_PASSWORD_FILE"] = other.password_file
         else:  # if neither a password command or password file were supplied, use password.
-            self.environment_vars["RESTIC_FROM_PASSWORD"] = other.password
+            combined_env["RESTIC_FROM_PASSWORD"] = other.password
 
         # execute restic CLI with the copy and other repository argument
         args = self._common_args()
@@ -307,7 +347,7 @@ class Repository:
 
         return self.restic_cli.execute(
             args,
-            environment_vars=self.environment_vars,
+            environment_vars=combined_env,
             live_output=live_output,
             json=json,
         )

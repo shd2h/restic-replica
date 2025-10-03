@@ -11,5 +11,5 @@ def repository_fixture(restic_cli_fixture):
         "myrepo",
         restic_cli_fixture,
         password="secret",
-        environment_vars={"RESTIC_COMPRESSION": "true"},
+        environment_vars={"RESTIC_COMPRESSION": "max"},
     )

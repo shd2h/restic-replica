@@ -11,6 +11,13 @@ from restic_replica import repository
 class TestResticCli:
     """Tests for the class repository.ResticCli"""
 
+    @pytest.fixture(autouse=True)
+    def mock_os_environ(self, monkeypatch):
+        monkeypatch.setattr(
+            "os.environ",
+            {},
+        )
+
     class TestExecuteLiveOutput:
         """Tests for the _execute_live_output method"""
 
@@ -105,21 +112,26 @@ class TestResticCli:
             assert process.args == args_with_restic
 
         @pytest.mark.usefixtures("restic_cli_fixture")
-        def test_class_env_vars(self, fp, restic_cli_fixture):
+        def test_class_env_vars(self, restic_cli_fixture, monkeypatch):
             """
             environment variables should be set, with the ResticCli fixture environment
             variables having primacy. The input ductionary should not be mutated.
             """
+
+            def return_environ(*args, **kwargs):
+                """function that returns a copy of the os.environment dictionary"""
+                return os.environ.copy()
+
             environment_vars = {
                 "RESTIC_PROGRESS_FPS": "60",
                 "RESTIC_PASSWORD": "secret",
             }
-            fp.register(["restic", "snapshots"], stdout=None)
-            restic_cli_fixture.execute(["snapshots"], environment_vars)
-            # existing variable should be set to class value
-            assert os.environ["RESTIC_PROGRESS_FPS"] == "0.016667"
-            # new variable should be updated
-            assert os.environ["RESTIC_PASSWORD"] == "secret"
+            monkeypatch.setattr("subprocess.run", return_environ)
+            process_env = restic_cli_fixture.execute(["snapshots"], environment_vars)
+            # variable already existing in class should be set to class value, not new value
+            assert process_env["RESTIC_PROGRESS_FPS"] == "0.016667"
+            # new variable should be added
+            assert process_env["RESTIC_PASSWORD"] == "secret"
             # original environment_vars dict should not be mutated
             assert environment_vars == {
                 "RESTIC_PROGRESS_FPS": "60",
@@ -173,6 +185,14 @@ class TestResticCli:
                     == fake_return
                 )
 
+        @pytest.mark.usefixtures("restic_cli_fixture")
+        def test_environment_vars_unset(self, fp, restic_cli_fixture):
+            """any environment variables that are set should be unset"""
+            fp.register(["restic", "snapshots"])
+            restic_cli_fixture.execute(["snapshots"])
+            for key in restic_cli_fixture.environment_vars.keys():
+                assert os.getenv(f"{key}") is None
+
 
 class TestRepository:
     """Tests for the class repository.Repository"""
@@ -187,7 +207,7 @@ class TestRepository:
             appended to the existing environment variables dictionary.
             """
             assert repository_fixture.environment_vars == {
-                "RESTIC_COMPRESSION": "true",
+                "RESTIC_COMPRESSION": "max",
                 "RESTIC_PASSWORD": "secret",
             }
 
@@ -277,6 +297,21 @@ class TestRepository:
             with pytest.raises(ValueError):
                 repository_fixture._verify_password_is_set()
 
+    class TestFilterOtherEnv:
+        """Tests for the method _filter_other_env"""
+
+        def test_filter(self, repository_fixture):
+            """RESTIC_PASSWORD, RESTIC_PASSWORD_FILE, and RESTIC_PASSWORD_COMMAND should be filtered out"""
+            environment_vars = {
+                "RESTIC_COMPRESSION": "max",
+                "RESTIC_PASSWORD": "secret",
+                "RESTIC_PASSWORD_FILE": "/path/to/password-file",
+                "RESTIC_PASSWORD_COMMAND": "/path/to/password-command",
+            }
+            assert dict(
+                filter(repository_fixture._filter_other_env, environment_vars.items())
+            ) == {"RESTIC_COMPRESSION": "max"}
+
     class TestSnapshots:
         """Tests for the snapshots method"""
 
@@ -357,7 +392,11 @@ class TestRepository:
         def other_repository_fixture(self, restic_cli_fixture):
             """Return a (:class:`repository.Repository`) instance"""
             return repository.Repository(
-                "/tmp/repo2", "repo2", restic_cli_fixture, "secret2"
+                "/tmp/repo2",
+                "repo2",
+                restic_cli_fixture,
+                "secret2",
+                environment_vars={"RESTIC_COMPRESSION": "off", "RESTIC_PACK_SIZE": 128},
             )
 
         @pytest.mark.usefixtures("repository_fixture")
@@ -392,7 +431,9 @@ class TestRepository:
                 "execute",
                 self.return_kwargs,
             ):
-                expected_environment_vars = {}
+                expected_environment_vars = (
+                    other_repository_fixture.environment_vars.copy()
+                )
                 expected_environment_vars.update(repository_fixture.environment_vars)
                 expected_environment_vars["RESTIC_FROM_PASSWORD"] = (
                     other_repository_fixture.password
@@ -414,8 +455,15 @@ class TestRepository:
                 "execute",
                 self.return_kwargs,
             ):
+                # switch password for password_file
                 other_repository_fixture.password_file = "/path/to/password-file2"
-                expected_environment_vars = {}
+                repository_fixture.password_file = "/path/to/password-file"
+                other_repository_fixture.environment_vars.pop("RESTIC_PASSWORD", None)
+                repository_fixture.environment_vars.pop("RESTIC_PASSWORD", None)
+
+                expected_environment_vars = (
+                    other_repository_fixture.environment_vars.copy()
+                )
                 expected_environment_vars.update(repository_fixture.environment_vars)
                 expected_environment_vars["RESTIC_FROM_PASSWORD_FILE"] = (
                     other_repository_fixture.password_file
@@ -437,8 +485,44 @@ class TestRepository:
                 "execute",
                 self.return_kwargs,
             ):
+                # switch password for password_command
+                other_repository_fixture.password_command = "/path/to/password-command2"
+                repository_fixture.password_command = "/path/to/password-command"
+                other_repository_fixture.environment_vars.pop("RESTIC_PASSWORD", None)
+                repository_fixture.environment_vars.pop("RESTIC_PASSWORD", None)
+
+                expected_environment_vars = (
+                    other_repository_fixture.environment_vars.copy()
+                )
+                expected_environment_vars.update(repository_fixture.environment_vars)
+                expected_environment_vars["RESTIC_FROM_PASSWORD_COMMAND"] = (
+                    other_repository_fixture.password_command
+                )
+                assert (
+                    repository_fixture.copy(other_repository_fixture)[
+                        "environment_vars"
+                    ]
+                    == expected_environment_vars
+                )
+
+        @pytest.mark.usefixtures("repository_fixture", "other_repository_fixture")
+        def test_other_environment_vars(
+            self, repository_fixture, other_repository_fixture
+        ):
+            """the other repository environment vars should also be set, unless they conflict with the current repository environment vars"""
+            with mock.patch.object(
+                repository_fixture.restic_cli,
+                "execute",
+                self.return_kwargs,
+            ):
                 other_repository_fixture.password_command = "/path/to/password-command2"
                 expected_environment_vars = {}
+                expected_environment_vars.update(
+                    other_repository_fixture.environment_vars
+                )
+                expected_environment_vars.pop("RESTIC_PASSWORD", None)
+                expected_environment_vars.pop("RESTIC_PASSWORD_FILE", None)
+                expected_environment_vars.pop("RESTIC_PASSWORD_COMMAND", None)
                 expected_environment_vars.update(repository_fixture.environment_vars)
                 expected_environment_vars["RESTIC_FROM_PASSWORD_COMMAND"] = (
                     other_repository_fixture.password_command
