@@ -21,6 +21,7 @@
 # keep-weekly = 8
 # keep-monthly = 6
 # keep-yearly = 2
+# exclude-current-period = false
 
 
 [source]
