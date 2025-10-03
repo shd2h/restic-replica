@@ -243,6 +243,20 @@ class TestGetPolicy:
         with pytest.raises(RuntimeError):
             app.get_policy({"keep-last": 0})
 
+    @pytest.mark.parametrize(
+        "state",
+        [True, False],
+    )
+    def test_no_current_set(self, state):
+        """setting exclude-current-period should set no_current in the returned Policy instance"""
+        assert app.get_policy(
+            {"keep-last": 1, "exclude-current-period": state}
+        ) == Policy(1, no_current=state)
+
+    def test_no_current_unset(self):
+        """omitting exclude-current-period should set no_current to False in the returned Policy instance"""
+        assert app.get_policy({"keep-last": 1}) == Policy(1, no_current=False)
+
 
 class TestGetRepository:
     """Tests for the function app.get_repository"""

@@ -26,7 +26,28 @@ class TestPolicy:
         )
         def test_positive_int_only(self, arg, expectation):
             with expectation:
-                snapshots.Policy(arg)
+                snapshots.Policy(arg, 0, 0, 0, 0)
+                snapshots.Policy(0, arg, 0, 0, 0)
+                snapshots.Policy(0, 0, arg, 0, 0)
+                snapshots.Policy(0, 0, 0, arg, 0)
+                snapshots.Policy(0, 0, 0, 0, arg)
+
+        @pytest.mark.parametrize(
+            "arg, expectation",
+            [
+                (True, does_not_raise()),
+                (False, does_not_raise()),
+                (0, does_not_raise()),  # int 0 maps to False
+                (1, does_not_raise()),  # int 1 maps to True
+                (2, pytest.raises(TypeError)),  # int gt 1 does not resolve to bool
+                (-1, pytest.raises(TypeError)),  # int lt 0 does not resolve to bool
+                ("foo", pytest.raises(TypeError)),
+            ],
+        )
+        def test_no_current(self, arg, expectation):
+            """exclude-current-period should only accept a boolean (or a 0, or a 1, as those resolve to true/false)"""
+            with expectation:
+                snapshots.Policy(1, no_current=arg)
 
     class TestStr:
         """Tests for the __str__ method"""
@@ -42,6 +63,10 @@ class TestPolicy:
                 (
                     snapshots.Policy(5, 4, 3, 2, 1),
                     "keep-last=5, keep-daily=4, keep-weekly=3, keep-monthly=2, keep-yearly=1",
+                ),
+                (
+                    snapshots.Policy(5, 0, 0, 0, 0, True),
+                    "keep-last=5, exclude-current-period=True",
                 ),
             ],
         )
@@ -328,7 +353,6 @@ class TestSnapshotList:
                 new_snapshot(datetime.date(2025, 9, 19)),
                 new_snapshot(datetime.date(2025, 9, 18)),
             ]
-
             assert snapshot_list_fixture._filter_daily(3, snap_list) == snap_list[:3]
 
         @pytest.mark.usefixtures("snapshot_list_fixture")
@@ -367,7 +391,6 @@ class TestSnapshotList:
                 new_snapshot(datetime.date(2025, 9, 21)),  # sunday
                 new_snapshot(datetime.date(2025, 9, 20)),
             ]
-
             assert snapshot_list_fixture._filter_daily(3, snap_list) == snap_list[:3]
 
         @pytest.mark.usefixtures("snapshot_list_fixture")
@@ -398,6 +421,61 @@ class TestSnapshotList:
             # snapshot_list_fixture has three snapshots from a single day, out of 10 total
             snap_list = snapshot_list_fixture.snapshots
             assert len(snapshot_list_fixture._filter_daily(10, snap_list)) == 8
+
+        @pytest.mark.usefixtures("snapshot_list_fixture")
+        def test_no_current(self, snapshot_list_fixture):
+            """if no_current is set and a snapshot lies within the current time period, it should be excluded"""
+            snap_list = [
+                new_snapshot(datetime.datetime(2025, 9, 21)),
+                new_snapshot(datetime.datetime(2025, 9, 20)),
+                new_snapshot(datetime.datetime(2025, 9, 19)),
+                new_snapshot(datetime.datetime(2025, 9, 18)),
+            ]
+            assert (
+                snapshot_list_fixture._filter_daily(
+                    3,
+                    snap_list,
+                    no_current=True,
+                    current_time=datetime.datetime(2025, 9, 21),
+                )
+                == snap_list[1:]
+            )
+
+        @pytest.mark.usefixtures("snapshot_list_fixture")
+        def test_snapshot_timezone_primacy(self, snapshot_list_fixture):
+            """
+            the timezone recorded in the snapshot should have primacy when determining in which period the snapshot falls
+            e.g. 2018-11-03T01:38:41+01:00, and 2018-11-04T01:38:41+06:00, should be considered as having been taken on different days.
+            this matches restic behaviour: https://forum.restic.net/t/which-timezone-does-forget-use/1166
+            """
+            snap_list = [
+                new_snapshot(
+                    datetime.datetime(
+                        2018,
+                        11,
+                        4,
+                        1,
+                        38,
+                        41,
+                        tzinfo=datetime.timezone(datetime.timedelta(seconds=21600)),
+                    )
+                ),
+                new_snapshot(
+                    datetime.datetime(
+                        2018,
+                        11,
+                        3,
+                        1,
+                        38,
+                        41,
+                        tzinfo=datetime.timezone(datetime.timedelta(seconds=3600)),
+                    )
+                ),
+            ]
+            assert (
+                len(snapshot_list_fixture._filter_daily(2, snap_list, no_current=True))
+                == 2
+            )
 
     class TestFilterWeekly:
         """Tests for the _filter_weekly method"""
@@ -476,6 +554,61 @@ class TestSnapshotList:
             snap_list = snapshot_list_fixture.snapshots
             assert len(snapshot_list_fixture._filter_weekly(10, snap_list)) == 5
 
+        @pytest.mark.usefixtures("snapshot_list_fixture")
+        def test_no_current(self, snapshot_list_fixture):
+            """if no_current is set and a snapshot lies within the current time period, it should be excluded"""
+            snap_list = [
+                new_snapshot(datetime.date(2025, 9, 29)),
+                new_snapshot(datetime.date(2025, 9, 22)),
+                new_snapshot(datetime.date(2025, 9, 15)),
+                new_snapshot(datetime.date(2025, 9, 8)),
+            ]
+            assert (
+                snapshot_list_fixture._filter_weekly(
+                    3,
+                    snap_list,
+                    no_current=True,
+                    current_time=datetime.datetime(2025, 9, 30),
+                )
+                == snap_list[1:]
+            )
+
+        @pytest.mark.usefixtures("snapshot_list_fixture")
+        def test_snapshot_timezone_primacy(self, snapshot_list_fixture):
+            """
+            the timezone recorded in the snapshot should have primacy when determining in which period the snapshot falls
+            e.g. 2018-11-03T01:38:41+01:00, and 2018-11-04T01:38:41+06:00, should be considered as having been taken on different days.
+            this matches restic behaviour: https://forum.restic.net/t/which-timezone-does-forget-use/1166
+            """
+            snap_list = [
+                new_snapshot(
+                    datetime.datetime(
+                        2018,
+                        11,
+                        5,
+                        1,
+                        38,
+                        41,
+                        tzinfo=datetime.timezone(datetime.timedelta(seconds=21600)),
+                    )
+                ),
+                new_snapshot(
+                    datetime.datetime(
+                        2018,
+                        11,
+                        4,
+                        1,
+                        38,
+                        41,
+                        tzinfo=datetime.timezone(datetime.timedelta(seconds=3600)),
+                    )
+                ),
+            ]
+            assert (
+                len(snapshot_list_fixture._filter_weekly(2, snap_list, no_current=True))
+                == 2
+            )
+
     class TestFilterMonthly:
         """Tests for the _filter_monthly method"""
 
@@ -542,6 +675,63 @@ class TestSnapshotList:
             snap_list = snapshot_list_fixture.snapshots
             assert len(snapshot_list_fixture._filter_monthly(10, snap_list)) == 4
 
+        @pytest.mark.usefixtures("snapshot_list_fixture")
+        def test_no_current(self, snapshot_list_fixture):
+            """if no_current is set and a snapshot lies within the current time period, it should be excluded"""
+            snap_list = [
+                new_snapshot(datetime.date(2025, 9, 29)),
+                new_snapshot(datetime.date(2025, 8, 11)),
+                new_snapshot(datetime.date(2025, 7, 6)),
+                new_snapshot(datetime.date(2025, 5, 31)),
+            ]
+            assert (
+                snapshot_list_fixture._filter_monthly(
+                    3,
+                    snap_list,
+                    no_current=True,
+                    current_time=datetime.datetime(2025, 9, 30),
+                )
+                == snap_list[1:]
+            )
+
+        @pytest.mark.usefixtures("snapshot_list_fixture")
+        def test_snapshot_timezone_primacy(self, snapshot_list_fixture):
+            """
+            the timezone recorded in the snapshot should have primacy when determining in which period the snapshot falls
+            e.g. 2018-11-03T01:38:41+01:00, and 2018-11-04T01:38:41+06:00, should be considered as having been taken on different days.
+            this matches restic behaviour: https://forum.restic.net/t/which-timezone-does-forget-use/1166
+            """
+            snap_list = [
+                new_snapshot(
+                    datetime.datetime(
+                        2018,
+                        11,
+                        1,
+                        1,
+                        38,
+                        41,
+                        tzinfo=datetime.timezone(datetime.timedelta(seconds=21600)),
+                    )
+                ),
+                new_snapshot(
+                    datetime.datetime(
+                        2018,
+                        10,
+                        31,
+                        1,
+                        38,
+                        41,
+                        tzinfo=datetime.timezone(datetime.timedelta(seconds=3600)),
+                    )
+                ),
+            ]
+            assert (
+                len(
+                    snapshot_list_fixture._filter_monthly(2, snap_list, no_current=True)
+                )
+                == 2
+            )
+
     class TestFilterYearly:
         """Tests for the _filter_yearly method"""
 
@@ -596,3 +786,58 @@ class TestSnapshotList:
             # snapshot_list_fixture has 2 snapshots from unique years, out of 10 total
             snap_list = snapshot_list_fixture.snapshots
             assert len(snapshot_list_fixture._filter_yearly(10, snap_list)) == 2
+
+        @pytest.mark.usefixtures("snapshot_list_fixture")
+        def test_no_current(self, snapshot_list_fixture):
+            """if no_current is set and a snapshot lies within the current time period, it should be excluded"""
+            snap_list = [
+                new_snapshot(datetime.date(2025, 9, 29)),
+                new_snapshot(datetime.date(2024, 9, 23)),
+                new_snapshot(datetime.date(2023, 7, 6)),
+                new_snapshot(datetime.date(2022, 5, 31)),
+            ]
+            assert (
+                snapshot_list_fixture._filter_yearly(
+                    3,
+                    snap_list,
+                    no_current=True,
+                    current_time=datetime.datetime(2025, 11, 21),
+                )
+                == snap_list[1:]
+            )
+
+        @pytest.mark.usefixtures("snapshot_list_fixture")
+        def test_snapshot_timezone_primacy(self, snapshot_list_fixture):
+            """
+            the timezone recorded in the snapshot should have primacy when determining in which period the snapshot falls
+            e.g. 2018-11-03T01:38:41+01:00, and 2018-11-04T01:38:41+06:00, should be considered as having been taken on different days.
+            this matches restic behaviour: https://forum.restic.net/t/which-timezone-does-forget-use/1166
+            """
+            snap_list = [
+                new_snapshot(
+                    datetime.datetime(
+                        2019,
+                        1,
+                        1,
+                        1,
+                        38,
+                        41,
+                        tzinfo=datetime.timezone(datetime.timedelta(seconds=21600)),
+                    )
+                ),
+                new_snapshot(
+                    datetime.datetime(
+                        2018,
+                        12,
+                        31,
+                        1,
+                        38,
+                        41,
+                        tzinfo=datetime.timezone(datetime.timedelta(seconds=3600)),
+                    )
+                ),
+            ]
+            assert (
+                len(snapshot_list_fixture._filter_yearly(2, snap_list, no_current=True))
+                == 2
+            )

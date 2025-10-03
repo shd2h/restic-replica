@@ -22,9 +22,13 @@ class Policy:
     weekly: int = 0
     monthly: int = 0
     yearly: int = 0
+    no_current: bool = False
 
     def __post_init__(self):
+        if self.no_current not in (True, False):
+            raise TypeError("exclude-current-period must be a boolean")
         for key in self.__dict__:
+            # NB: this doesn't blow up because bool is a subclass of int.
             if not isinstance(self.__dict__[key], int):
                 raise TypeError(f"{key} must be an integer")
             if self.__dict__[key] < 0:
@@ -44,6 +48,8 @@ class Policy:
             output.append(f"keep-monthly={self.monthly}")
         if self.yearly > 0:
             output.append(f"keep-yearly={self.yearly}")
+        if self.no_current:
+            output.append(f"exclude-current-period={self.no_current}")
         return ", ".join(output)
 
 
@@ -120,6 +126,8 @@ class SnapshotList:
         # snapshots must be sorted in descending date order for filter methods to work correctly
         sorted_snapshots = self.time_sorted(descending=True)
         filtered_snapshots = []
+        # store local timestamp to avoid timing inconsistencies between filters
+        current_time = datetime.now()
         # Filters are additive. Start with least restrictive filters and work down from there.
         # NB: pass in sorted_snapshots to avoid repeatedly sorting the snapshot list
         # Apply the last filter
@@ -128,22 +136,30 @@ class SnapshotList:
         # Apply the daily filter
         if policy.daily:
             filtered_snapshots.extend(
-                self._filter_daily(policy.daily, sorted_snapshots)
+                self._filter_daily(
+                    policy.daily, sorted_snapshots, policy.no_current, current_time
+                )
             )
         # Apply the weekly filter
         if policy.weekly:
             filtered_snapshots.extend(
-                self._filter_weekly(policy.weekly, sorted_snapshots)
+                self._filter_weekly(
+                    policy.weekly, sorted_snapshots, policy.no_current, current_time
+                )
             )
         # Apply the monthly filter
         if policy.monthly:
             filtered_snapshots.extend(
-                self._filter_monthly(policy.monthly, sorted_snapshots)
+                self._filter_monthly(
+                    policy.monthly, sorted_snapshots, policy.no_current, current_time
+                )
             )
         # Apply the yearly filter
         if policy.yearly:
             filtered_snapshots.extend(
-                self._filter_yearly(policy.yearly, sorted_snapshots)
+                self._filter_yearly(
+                    policy.yearly, sorted_snapshots, policy.no_current, current_time
+                )
             )
 
         # remove duplicates, filtering by id as that is unique per-snapshot
@@ -171,7 +187,13 @@ class SnapshotList:
         """
         return sorted_snapshots[:last]
 
-    def _filter_daily(self, daily: int, sorted_snapshots: list[Snapshot]):
+    def _filter_daily(
+        self,
+        daily: int,
+        sorted_snapshots: list[Snapshot],
+        no_current: bool = False,
+        current_time: Optional[datetime] = datetime.now(),
+    ):
         """
         Return the most recent 'n' snapshots from sorted_snapshots, with a maximum of
         one snapshot per calendar day.
@@ -180,22 +202,32 @@ class SnapshotList:
         Args:
             daily: the number of snapshots to return
             sorted_snapshots: list of snapshots, sorted in descending date order.
-
+            no_current: whether snapshots within the current time period should be ignored.
+            current_time: datetime aware object representing current time
         Returns:
             filtered_snapshots: a filtered list of snapshots
         """
         filtered_snapshots = []
+        # datetime.isocalendar is unique on a per-day, per-year, and per-month basis.
+        current_period = current_time.isocalendar()
         for snap in sorted_snapshots:
             # only process if target # of snapshots has not already been reached
             if len(filtered_snapshots) < daily:
-                # datetime.isocalendar is unique on a per-day, per-year, and per-month basis.
-                if snap.time.isocalendar() not in map(
-                    lambda s: s.time.isocalendar(), filtered_snapshots
-                ):
-                    filtered_snapshots.append(snap)
+                snap_period = snap.time.isocalendar()  # snapshot ts, to day resolution
+                if not (no_current and snap_period == current_period):
+                    if snap_period not in map(
+                        lambda s: s.time.isocalendar(), filtered_snapshots
+                    ):
+                        filtered_snapshots.append(snap)
         return filtered_snapshots
 
-    def _filter_weekly(self, weekly: int, sorted_snapshots: list[Snapshot]):
+    def _filter_weekly(
+        self,
+        weekly: int,
+        sorted_snapshots: list[Snapshot],
+        no_current: bool = False,
+        current_time: Optional[datetime] = datetime.now(),
+    ):
         """
         Return the most recent 'n' snapshots from sorted_snapshots, with a maximum of
         one snapshot per calendar week.
@@ -204,6 +236,8 @@ class SnapshotList:
         Args:
             daily: the number of snapshots to return
             sorted_snapshots: list of snapshots, sorted in descending date order.
+            no_current: whether snapshots within the current time period should be ignored.
+            current_time: datetime aware object representing current time
 
         Returns:
             filtered_snapshots: a filtered list of snapshots
@@ -211,18 +245,28 @@ class SnapshotList:
         filtered_snapshots = []
         # use tuple that is unique on a per-week and per-year basis.
         YearWeek = namedtuple("YearWeek", "year week")
+        # isocalendar().week gives week # in year
+        current_period = YearWeek(current_time.year, current_time.isocalendar().week)
         for snap in sorted_snapshots:
             # only process if target # of snapshots has not already been reached
             if len(filtered_snapshots) < weekly:
-                # isocalendar().week gives week # in year
-                if YearWeek(snap.time.year, snap.time.isocalendar().week) not in map(
-                    lambda s: YearWeek(s.time.year, s.time.isocalendar().week),
-                    filtered_snapshots,
-                ):
-                    filtered_snapshots.append(snap)
+                # snapshot ts, to week resolution
+                snap_period = YearWeek(snap.time.year, snap.time.isocalendar().week)
+                if not (no_current and snap_period == current_period):
+                    if snap_period not in map(
+                        lambda s: YearWeek(s.time.year, s.time.isocalendar().week),
+                        filtered_snapshots,
+                    ):
+                        filtered_snapshots.append(snap)
         return filtered_snapshots
 
-    def _filter_monthly(self, monthly: int, sorted_snapshots: list[Snapshot]):
+    def _filter_monthly(
+        self,
+        monthly: int,
+        sorted_snapshots: list[Snapshot],
+        no_current: bool = False,
+        current_time: Optional[datetime] = datetime.now(),
+    ):
         """
         Return the most recent 'n' snapshots from sorted_snapshots, with a maximum of
         one snapshot per calendar month.
@@ -231,6 +275,8 @@ class SnapshotList:
         Args:
             daily: the number of snapshots to return
             sorted_snapshots: list of snapshots, sorted in descending date order.
+            no_current: whether snapshots within the current time period should be ignored.
+            current_time: datetime aware object representing current time
 
         Returns:
             filtered_snapshots: a filtered list of snapshots
@@ -238,16 +284,27 @@ class SnapshotList:
         filtered_snapshots = []
         # use tuple that is unique on a per-month and per-year basis.
         YearMonth = namedtuple("YearMonth", "year month")
+        current_period = YearMonth(current_time.year, current_time.month)
         for snap in sorted_snapshots:
             # only process if target # of snapshots has not already been reached
             if len(filtered_snapshots) < monthly:
-                if YearMonth(snap.time.year, snap.time.month) not in map(
-                    lambda s: YearMonth(s.time.year, s.time.month), filtered_snapshots
-                ):
-                    filtered_snapshots.append(snap)
+                # snapshot ts, to month resolution
+                snap_period = YearMonth(snap.time.year, snap.time.month)
+                if not (no_current and snap_period == current_period):
+                    if snap_period not in map(
+                        lambda s: YearMonth(s.time.year, s.time.month),
+                        filtered_snapshots,
+                    ):
+                        filtered_snapshots.append(snap)
         return filtered_snapshots
 
-    def _filter_yearly(self, yearly: int, sorted_snapshots: list[Snapshot]):
+    def _filter_yearly(
+        self,
+        yearly: int,
+        sorted_snapshots: list[Snapshot],
+        no_current: bool = False,
+        current_time: Optional[datetime] = datetime.now(),
+    ):
         """
         Return the most recent 'n' snapshots from sorted_snapshots, with a maximum of
         one snapshot per calendar year.
@@ -256,15 +313,21 @@ class SnapshotList:
         Args:
             daily: the number of snapshots to return
             sorted_snapshots: list of snapshots, sorted in descending date order.
+            no_current: whether snapshots within the current time period should be ignored.
 
         Returns:
             filtered_snapshots: a filtered list of snapshots
         """
         filtered_snapshots = []
         # filter only by year
+        current_period = current_time.year
         for snap in sorted_snapshots:
             # only process if target # of snapshots has not already been reached
             if len(filtered_snapshots) < yearly:
-                if snap.time.year not in map(lambda s: s.time.year, filtered_snapshots):
-                    filtered_snapshots.append(snap)
+                snap_period = snap.time.year
+                if not (no_current and snap_period == current_period):
+                    if snap_period not in map(
+                        lambda s: s.time.year, filtered_snapshots
+                    ):
+                        filtered_snapshots.append(snap)
         return filtered_snapshots

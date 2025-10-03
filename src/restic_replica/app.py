@@ -168,11 +168,22 @@ def get_policy(config: dict) -> Optional[Policy]:
         user_set_policy = True
     except KeyError:
         keep_yearly = 0
+    try:
+        no_current = config["exclude-current-period"]
+    except KeyError:
+        no_current = False
 
     # if user set any values, return a policy, else return none
     if user_set_policy:
         try:
-            return Policy(keep_last, keep_daily, keep_weekly, keep_monthly, keep_yearly)
+            return Policy(
+                keep_last,
+                keep_daily,
+                keep_weekly,
+                keep_monthly,
+                keep_yearly,
+                no_current,
+            )
         except (ValueError, TypeError) as err:
             raise RuntimeError(
                 "Invalid policy; all keep-* options set in the config file must be non-negative integers, and at least one must be non-zero."
