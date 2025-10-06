@@ -4,7 +4,25 @@ version = "0.1.2.dev0"
 description = "python-based cli tool to copy restic snapshots between repositories"
 readme = "README.md"
 requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
+keywords = ["restic"]
+authors = [{name = "Nathan Cronin"}]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: System :: Archiving :: Mirroring",
+    "Operating System :: OS Independent"
+]
 dependencies = []
+
+[project.urls]
+Documentation = "https://github.com/shd2h/restic-replica#readme"
+Issues = "https://github.com/shd2h/restic-replica/issues"
+Source = "https://github.com/shd2h/restic-replica"
 
 [dependency-groups]
 dev = [
