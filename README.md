@@ -11,7 +11,7 @@ Why?
 ## Installation
 
 ```console
-pip install restic_replica*.whl
+pip install restic_replica
 ```
 
 ## Usage
