@@ -1,5 +1,5 @@
 # restic-replica
-The current project status should be considered as "alpha". While the tool is in a usable state, not all planned core functionality has been implemented yet, and the cli may change.
+The current project status should be considered as "beta".
 
 ## Info
 A command line tool to copy snapshots between Restic repositories, written in python.  
