@@ -326,15 +326,24 @@ class TestCheckRepositoryAccess:
             assert app.check_repository_access(repository_fixture)
 
     @pytest.mark.usefixtures("repository_fixture")
-    def test_invalid_repository(self, repository_fixture):
+    def test_invalid_repository(self, repository_fixture, caplog):
         """Should raise a RuntimeError if the repository is unable to be accessed"""
         with mock.patch.object(
             repository_fixture,
             "snapshots",
-            side_effect=CalledProcessError(1, "notalrealcommand"),
+            side_effect=CalledProcessError(
+                1,
+                "notalrealcommand",
+                "",
+                "this command does not exist\nuse another command\n",
+            ),
         ):
             with pytest.raises(RuntimeError):
                 app.check_repository_access(repository_fixture)
+            assert caplog.messages[0:2] == [
+                "this command does not exist",
+                "use another command",
+            ]
 
     @pytest.mark.usefixtures("repository_fixture")
     def test_restic_error(self, repository_fixture):
@@ -422,12 +431,17 @@ class TestCopySnapshots:
             )
 
     @pytest.mark.usefixtures("repository_fixture", "restic_cli_fixture")
-    def test_copy_fail(self, repository_fixture, restic_cli_fixture):
+    def test_copy_fail(self, repository_fixture, restic_cli_fixture, caplog):
         """Should raise RuntimeError if the copy operation fails"""
         with mock.patch.object(
             repository_fixture,
             "copy",
-            side_effect=CalledProcessError(1, "notalrealcommand"),
+            side_effect=CalledProcessError(
+                1,
+                "notalrealcommand",
+                "",
+                "this command does not exist\nuse another command\n",
+            ),
         ):
             with pytest.raises(RuntimeError):
                 app.copy_snapshots(
@@ -439,6 +453,10 @@ class TestCopySnapshots:
                     ),
                     repository_fixture,
                 )
+            assert caplog.messages[0:2] == [
+                "this command does not exist",
+                "use another command",
+            ]
 
     @pytest.mark.usefixtures("repository_fixture", "restic_cli_fixture")
     def test_restic_error(self, repository_fixture, restic_cli_fixture):
