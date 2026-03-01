@@ -431,13 +431,13 @@ class TestCopySnapshots:
         ):
             with pytest.raises(RuntimeError):
                 app.copy_snapshots(
-                    repository_fixture,
                     Repository(
                         "/tmp/restic-repo2",
                         "myrepo2",
                         restic_cli_fixture,
                         password="secret2",
                     ),
+                    repository_fixture,
                 )
 
     @pytest.mark.usefixtures("repository_fixture", "restic_cli_fixture")
@@ -452,13 +452,13 @@ class TestCopySnapshots:
         ):
             with pytest.raises(RuntimeError):
                 app.copy_snapshots(
-                    repository_fixture,
                     Repository(
                         "/tmp/restic-repo2",
                         "myrepo2",
                         restic_cli_fixture,
                         password="secret2",
                     ),
+                    repository_fixture,
                 )
 
     @pytest.mark.usefixtures(
