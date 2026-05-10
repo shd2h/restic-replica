@@ -259,8 +259,8 @@ class TestSnapshotList:
         @pytest.mark.usefixtures("snapshot_fixture")
         def test_ingest(self, snapshot_fixture):
             """json should be parsed and return valid snapshotlist and snapshot instances"""
+            # fmt: off
             data = textwrap.dedent(
-                # fmt: off
                 "["
                     "{"
                         '"time":"2025-09-22T15:19:14.968650111+01:00",'
@@ -295,8 +295,8 @@ class TestSnapshotList:
                         '"short_id":"13fc6fb1"'
                     "}"
                 "]"
-                # fmt: on
             )
+            # fmt: on
             assert snapshots.SnapshotList.from_json(data).snapshots == [
                 snapshot_fixture
             ]
@@ -305,6 +305,59 @@ class TestSnapshotList:
             """empty json data should return an empty snapshotlist instance"""
             data = "[]"
             assert snapshots.SnapshotList.from_json(data).snapshots == []
+
+    class TestFromDict:
+        """Tests for the from_dict method"""
+
+        @pytest.mark.usefixtures("snapshot_fixture")
+        def test_ingest(self, snapshot_fixture):
+            """dictionary should be parsed and return valid snapshotlist and snapshot instances"""
+            data = {
+                "group_key": {
+                    "hostname": "server.local",
+                    "paths": ["/etc/hosts"],
+                    "tags": None,
+                },
+                "snapshots": [
+                    {
+                        "time": "2025-09-22T15:19:14.968650111+01:00",
+                        "parent": "ef699e0b81670666e639c0271b09edc6b4e3158277e3dd1c0d72809b44c468f1",
+                        "tree": "a9c65ce7565f9e7456606dd0119ab186ba5aefc6fb883f433e7a6b406c0f6771",
+                        "paths": ["/etc/hosts"],
+                        "hostname": "server.local",
+                        "username": "user",
+                        "uid": 1000,
+                        "gid": 1000,
+                        "excludes": ["/etc/nothosts"],
+                        "tags": ["rewrite"],
+                        "original": "e2adfd3564420f9447d42337356100a168dbf9c1de25b3086fbdc9c4a18ba4a1",
+                        "program_version": "restic 0.18.0",
+                        "summary": {
+                            "backup_start": "2025-09-22T15:19:14.968650111+01:00",
+                            "backup_end": "2025-09-22T15:19:15.693199959+01:00",
+                            "files_new": 1,
+                            "files_changed": 0,
+                            "files_unmodified": 0,
+                            "dirs_new": 1,
+                            "dirs_changed": 0,
+                            "dirs_unmodified": 0,
+                            "data_blobs": 1,
+                            "tree_blobs": 2,
+                            "data_added": 1288,
+                            "data_added_packed": 1028,
+                            "total_files_processed": 1,
+                            "total_bytes_processed": 384,
+                        },
+                        "id": "13fc6fb1a3ce4ba6a693bc7e0f6f651394e0699db4c38080c2f7c1fabe5210b2",
+                        "short_id": "13fc6fb1",
+                    }
+                ],
+            }
+            snap_list = snapshots.SnapshotList.from_dict(data)
+            assert snap_list.snapshots == [snapshot_fixture]
+            assert snap_list.group_key == snapshots.GroupKey(
+                "server.local", ["/etc/hosts"]
+            )
 
     class TestTimeSorted:
         """Tests for the time_sorted method"""

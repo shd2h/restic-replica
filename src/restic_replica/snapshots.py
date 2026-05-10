@@ -132,16 +132,23 @@ class SnapshotList:
     """a list of restic snapshots"""
 
     snapshots: list[Snapshot]
+    group_key: Optional[GroupKey] = None
 
     def __str__(self):
         return ", ".join([snap.short_id for snap in self.snapshots])
 
+    # TODO: do we still need this method?
     @classmethod
     def from_json(cls, data):
-        snap_list = []
-        for snap in json.loads(data):
-            snap_list.append(Snapshot.from_dict(snap))
+        """instance a snapshot list from restic json output with no snapshot grouping"""
+        snap_list = [Snapshot.from_dict(snap) for snap in json.loads(data)]
         return cls(snap_list)
+
+    @classmethod
+    def from_dict(cls, data):
+        """instance a snapshot list from a dictionary with snapshot grouping"""
+        snap_list = [Snapshot.from_dict(snap) for snap in data["snapshots"]]
+        return cls(snap_list, GroupKey.from_dict(data["group_key"]))
 
     def time_sorted(self, descending=False):
         """
