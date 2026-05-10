@@ -74,6 +74,91 @@ class TestPolicy:
             assert str(policy) == expectation
 
 
+class TestSnapshotGroupByOptions:
+    """Tests for the class snapshots.SnapshotGroupByOptions"""
+
+    class TestEnabled:
+        """Tests for the enabled method"""
+
+        @pytest.mark.parametrize(
+            "options, expectation",
+            [
+                (snapshots.SnapshotGroupByOptions().enabled, True),
+                (snapshots.SnapshotGroupByOptions(True, True, True).enabled, True),
+                (snapshots.SnapshotGroupByOptions(False, True, True).enabled, True),
+                (snapshots.SnapshotGroupByOptions(True, False, True).enabled, True),
+                (snapshots.SnapshotGroupByOptions(True, True, False).enabled, True),
+                (snapshots.SnapshotGroupByOptions(False, False, True).enabled, True),
+                (snapshots.SnapshotGroupByOptions(True, False, False).enabled, True),
+                (snapshots.SnapshotGroupByOptions(False, True, False).enabled, True),
+                (snapshots.SnapshotGroupByOptions(False, False, False).enabled, False),
+            ],
+        )
+        def test_enabled(self, options, expectation):
+            """test the enabled property"""
+            assert options == expectation
+
+    class TestStr:
+        """Tests for the __str__ method"""
+
+        @pytest.mark.parametrize(
+            "options, expectation",
+            [
+                (str(snapshots.SnapshotGroupByOptions()), "host,path"),
+                (
+                    str(snapshots.SnapshotGroupByOptions(True, True, True)),
+                    "host,path,tag",
+                ),
+                (
+                    str(snapshots.SnapshotGroupByOptions(False, True, True)),
+                    "path,tag",
+                ),
+                (
+                    str(snapshots.SnapshotGroupByOptions(True, False, True)),
+                    "host,tag",
+                ),
+                (
+                    str(snapshots.SnapshotGroupByOptions(True, True, False)),
+                    "host,path",
+                ),
+                (str(snapshots.SnapshotGroupByOptions(False, False, True)), "tag"),
+                (str(snapshots.SnapshotGroupByOptions(True, False, False)), "host"),
+                (str(snapshots.SnapshotGroupByOptions(False, True, False)), "path"),
+                (str(snapshots.SnapshotGroupByOptions(False, False, False)), ""),
+            ],
+        )
+        def test_output(self, options, expectation):
+            """test the enabled property"""
+            assert options == expectation
+
+
+class TestGroupKey:
+    """Tests for the class snapshots.GroupKey"""
+
+    class TestFromDict:
+        """Tests for the from_dict method"""
+
+        def test_with_tags(self):
+            data = {
+                "hostname": "server.local",
+                "paths": ["/etc/hosts"],
+                "tags": ["bar", "foo"],
+            }
+            assert snapshots.GroupKey.from_dict(data) == snapshots.GroupKey(
+                "server.local", ["/etc/hosts"], ["bar", "foo"]
+            )
+
+        def test_without_tags(self):
+            data = {
+                "hostname": "server.local",
+                "paths": ["/etc/hosts"],
+                "tags": None,
+            }
+            assert snapshots.GroupKey.from_dict(data) == snapshots.GroupKey(
+                "server.local", ["/etc/hosts"], None
+            )
+
+
 class TestSnapshot:
     """Tests for the class snapshots.Snapshot"""
 

@@ -54,6 +54,50 @@ class Policy:
 
 
 @dataclass
+class SnapshotGroupByOptions:
+    """a group-by definition for a list of snapshots"""
+
+    host: bool = True
+    path: bool = True
+    tag: bool = False
+
+    @property
+    def enabled(self):
+        return self.host or self.path or self.tag
+
+    def __str__(self):
+        if self.host or self.path or self.tag:
+            all_options = ["host", "path", "tag"]
+            selectors = [self.host, self.path, self.tag]
+            enabled_options = list(compress(all_options, selectors))
+            return f"{','.join(enabled_options)}"
+        else:
+            return ""
+
+
+@dataclass
+class SnapshotFilterOptions:
+    """restic-level filtering options for snapshot listings"""
+
+    host: Optional[str] = None
+    path: Optional[str] = None
+    tag: Optional[list[str]] = None
+
+
+@dataclass
+class GroupKey:
+    """a restic group_key for a group of snapshots"""
+
+    hostname: str
+    paths: list[str]
+    tags: Optional[list[str]] = None
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(**data)
+
+
+@dataclass
 class Snapshot:
     """a restic snapshot"""
 
