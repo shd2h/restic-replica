@@ -1,9 +1,10 @@
-from contextlib import nullcontext as does_not_raise
 import datetime
-import pytest
 import random
 import textwrap
+from contextlib import nullcontext as does_not_raise
 from unittest import mock
+
+import pytest
 
 from restic_replica import snapshots
 from tests.utils import new_snapshot
@@ -135,27 +136,42 @@ class TestSnapshotGroupByOptions:
 class TestGroupKey:
     """Tests for the class snapshots.GroupKey"""
 
+    # Any one of the three could be null.
+    # {"group_key":{"hostname":"","paths":null,"tags":null}
+    # {"group_key":{"hostname":"server.local","paths":null,"tags":null}
+    # {"group_key":{"hostname":"","paths":["/etc/hosts"],"tags":null}
+    # {"group_key":{"hostname":"","paths":null,"tags":["foo"]}
     class TestFromDict:
         """Tests for the from_dict method"""
 
-        def test_with_tags(self):
+        def test_hostname(self):
             data = {
                 "hostname": "server.local",
-                "paths": ["/etc/hosts"],
-                "tags": ["bar", "foo"],
+                "paths": None,
+                "tags": None,
             }
             assert snapshots.GroupKey.from_dict(data) == snapshots.GroupKey(
-                "server.local", ["/etc/hosts"], ["bar", "foo"]
+                "server.local", None, None
             )
 
-        def test_without_tags(self):
+        def test_paths(self):
             data = {
-                "hostname": "server.local",
+                "hostname": None,
                 "paths": ["/etc/hosts"],
                 "tags": None,
             }
             assert snapshots.GroupKey.from_dict(data) == snapshots.GroupKey(
-                "server.local", ["/etc/hosts"], None
+                None, ["/etc/hosts"], None
+            )
+
+        def test_tags(self):
+            data = {
+                "hostname": None,
+                "paths": None,
+                "tags": ["bar", "foo"],
+            }
+            assert snapshots.GroupKey.from_dict(data) == snapshots.GroupKey(
+                None, None, ["bar", "foo"]
             )
 
 
@@ -240,77 +256,24 @@ class TestSnapshot:
             assert snapshots.Snapshot.from_dict(data) == snapshot_fixture
 
 
-class TestSnapshotList:
-    """Tests for the class snapshots.SnapshotList"""
+class TestSnapshotGroup:
+    """Tests for the class snapshots.SnapshotGroup"""
 
     class TestStr:
         """Tests for the __str__ method"""
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_output(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_output(self, snapshot_group_fixture):
             """output should be a list of snapshot short_ids"""
-            assert [x.strip() for x in str(snapshot_list_fixture).split(",")] == [
-                s.short_id for s in snapshot_list_fixture.snapshots
+            assert [x.strip() for x in str(snapshot_group_fixture).split(",")] == [
+                s.short_id for s in snapshot_group_fixture.snapshots
             ]
 
-    class TestFromJson:
-        """Tests for the from_json method"""
+    class TestFromGrouped:
+        """Tests for the from_grouped method"""
 
         @pytest.mark.usefixtures("snapshot_fixture")
-        def test_ingest(self, snapshot_fixture):
-            """json should be parsed and return valid snapshotlist and snapshot instances"""
-            # fmt: off
-            data = textwrap.dedent(
-                "["
-                    "{"
-                        '"time":"2025-09-22T15:19:14.968650111+01:00",'
-                        '"parent": "ef699e0b81670666e639c0271b09edc6b4e3158277e3dd1c0d72809b44c468f1",'
-                        '"tree":"a9c65ce7565f9e7456606dd0119ab186ba5aefc6fb883f433e7a6b406c0f6771",'
-                        '"paths":["/etc/hosts"],'
-                        '"hostname":"server.local",'
-                        '"username":"user",'
-                        '"uid":1000,'
-                        '"gid":1000,'
-                        '"excludes": ["/etc/nothosts"],'
-                        '"tags": ["rewrite"],'
-                        '"original": "e2adfd3564420f9447d42337356100a168dbf9c1de25b3086fbdc9c4a18ba4a1",'
-                        '"program_version":"restic 0.18.0",'
-                        '"summary": {'
-                            '"backup_start": "2025-09-22T15:19:14.968650111+01:00",'
-                            '"backup_end": "2025-09-22T15:19:15.693199959+01:00",'
-                            '"files_new": 1,'
-                            '"files_changed": 0,'
-                            '"files_unmodified": 0,'
-                            '"dirs_new": 1,'
-                            '"dirs_changed": 0,'
-                            '"dirs_unmodified": 0,'
-                            '"data_blobs": 1,'
-                            '"tree_blobs": 2,'
-                            '"data_added": 1288,'
-                            '"data_added_packed": 1028,'
-                            '"total_files_processed": 1,'
-                            '"total_bytes_processed": 384'
-                        "},"
-                        '"id":"13fc6fb1a3ce4ba6a693bc7e0f6f651394e0699db4c38080c2f7c1fabe5210b2",'
-                        '"short_id":"13fc6fb1"'
-                    "}"
-                "]"
-            )
-            # fmt: on
-            assert snapshots.SnapshotList.from_json(data).snapshots == [
-                snapshot_fixture
-            ]
-
-        def test_null_ingest(self):
-            """empty json data should return an empty snapshotlist instance"""
-            data = "[]"
-            assert snapshots.SnapshotList.from_json(data).snapshots == []
-
-    class TestFromDict:
-        """Tests for the from_dict method"""
-
-        @pytest.mark.usefixtures("snapshot_fixture")
-        def test_ingest(self, snapshot_fixture):
+        def test_grouped_ingest(self, snapshot_fixture):
             """dictionary should be parsed and return valid snapshotlist and snapshot instances"""
             data = {
                 "group_key": {
@@ -353,28 +316,72 @@ class TestSnapshotList:
                     }
                 ],
             }
-            snap_list = snapshots.SnapshotList.from_dict(data)
+            snap_list = snapshots.SnapshotGroup.from_grouped(data)
             assert snap_list.snapshots == [snapshot_fixture]
             assert snap_list.group_key == snapshots.GroupKey(
                 "server.local", ["/etc/hosts"]
             )
 
+    class TestFromUnrouped:
+        """Tests for the from_ungrouped method"""
+
+        @pytest.mark.usefixtures("snapshot_fixture")
+        def test_ungrouped_ingest(self, snapshot_fixture):
+            """list should be parsed and return valid snapshotlist and snapshot instances"""
+            data = [
+                {
+                    "time": "2025-09-22T15:19:14.968650111+01:00",
+                    "parent": "ef699e0b81670666e639c0271b09edc6b4e3158277e3dd1c0d72809b44c468f1",
+                    "tree": "a9c65ce7565f9e7456606dd0119ab186ba5aefc6fb883f433e7a6b406c0f6771",
+                    "paths": ["/etc/hosts"],
+                    "hostname": "server.local",
+                    "username": "user",
+                    "uid": 1000,
+                    "gid": 1000,
+                    "excludes": ["/etc/nothosts"],
+                    "tags": ["rewrite"],
+                    "original": "e2adfd3564420f9447d42337356100a168dbf9c1de25b3086fbdc9c4a18ba4a1",
+                    "program_version": "restic 0.18.0",
+                    "summary": {
+                        "backup_start": "2025-09-22T15:19:14.968650111+01:00",
+                        "backup_end": "2025-09-22T15:19:15.693199959+01:00",
+                        "files_new": 1,
+                        "files_changed": 0,
+                        "files_unmodified": 0,
+                        "dirs_new": 1,
+                        "dirs_changed": 0,
+                        "dirs_unmodified": 0,
+                        "data_blobs": 1,
+                        "tree_blobs": 2,
+                        "data_added": 1288,
+                        "data_added_packed": 1028,
+                        "total_files_processed": 1,
+                        "total_bytes_processed": 384,
+                    },
+                    "id": "13fc6fb1a3ce4ba6a693bc7e0f6f651394e0699db4c38080c2f7c1fabe5210b2",
+                    "short_id": "13fc6fb1",
+                },
+            ]
+            snap_list = snapshots.SnapshotGroup.from_ungrouped(data)
+            assert snap_list.snapshots == [snapshot_fixture]
+            assert snap_list.group_key == None
+
     class TestTimeSorted:
         """Tests for the time_sorted method"""
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_sort_ascending(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_sort_ascending(self, snapshot_group_fixture):
             """snapshots should be sorted by date ascending"""
-            random.shuffle(snapshot_list_fixture.snapshots)
-            sorted = snapshot_list_fixture.time_sorted(descending=False)
+            random.shuffle(snapshot_group_fixture.snapshots)
+            sorted = snapshot_group_fixture.time_sorted(descending=False)
             for i, snap in enumerate(sorted):
                 if i != 0:
                     assert snap.time > sorted[i - 1].time
 
-        def test_sort_descending(self, snapshot_list_fixture):
+        def test_sort_descending(self, snapshot_group_fixture):
             """snapshots should be sorted by date descending"""
-            random.shuffle(snapshot_list_fixture.snapshots)
-            sorted = snapshot_list_fixture.time_sorted(descending=True)
+            random.shuffle(snapshot_group_fixture.snapshots)
+            sorted = snapshot_group_fixture.time_sorted(descending=True)
             for i, snap in enumerate(sorted):
                 if i != 0:
                     assert snap.time < sorted[i - 1].time
@@ -382,49 +389,49 @@ class TestSnapshotList:
     class TestFilter:
         """Tests for the filter method"""
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_no_snapshots(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_no_snapshots(self, snapshot_group_fixture):
             """if no filters return any snapshots, then no snapshots should be returned"""
-            # snapshot_list_fixture has 10 snapshots
+            # snapshot_group_fixture has 10 snapshots
             # set a policy that will return nothing
             policy = snapshots.Policy(1, 0, 0, 0, 0)
             # set "last" to zero after init, to avoid triggering "all zeroes not allowed" check
             policy.last = 0
-            assert snapshot_list_fixture.filter(policy) == []
+            assert snapshot_group_fixture.filter(policy) == []
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_first_sort(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_first_sort(self, snapshot_group_fixture):
             """snapshots should be sorted into descending order of time before being passed to _filter* functions"""
             # policy.last set to non-zero value, so _filter_last will trigger
             policy = snapshots.Policy(99999, 0, 0, 0, 0)
             with mock.patch.object(
-                snapshot_list_fixture, "_filter_last", return_value=[]
+                snapshot_group_fixture, "_filter_last", return_value=[]
             ) as target:
-                snapshot_list_fixture.filter(policy)
+                snapshot_group_fixture.filter(policy)
             # assert that filter_last was called with the snapshots list sorted in reverse
             target.assert_called_with(
-                policy.last, list(reversed(snapshot_list_fixture.snapshots))
+                policy.last, list(reversed(snapshot_group_fixture.snapshots))
             )
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_return_sort(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_return_sort(self, snapshot_group_fixture):
             """snapshots should be sorted into ascending order when returned"""
             # invert the snapshot list, so it is sorted in reverse
-            snap_list = list(reversed(snapshot_list_fixture.snapshots))
+            snap_list = list(reversed(snapshot_group_fixture.snapshots))
             # policy.last set to non-zero value, so _filter_last will trigger
             policy = snapshots.Policy(1, 0, 0, 0, 0)
             # filter_last mocked to return reversed snapshot list
             with mock.patch.object(
-                snapshot_list_fixture, "_filter_last", return_value=snap_list
+                snapshot_group_fixture, "_filter_last", return_value=snap_list
             ):
                 # output should be sorted into ascending order again
                 assert (
-                    snapshot_list_fixture.filter(policy)
-                    == snapshot_list_fixture.snapshots
+                    snapshot_group_fixture.filter(policy)
+                    == snapshot_group_fixture.snapshots
                 )
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_filters_merge(self, snapshot_list_fixture, monkeypatch):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_filters_merge(self, snapshot_group_fixture, monkeypatch):
             """snapshots selected by each filter should all be combined into the output"""
 
             def new_snaps(*args, **kwargs):
@@ -433,57 +440,57 @@ class TestSnapshotList:
             # enable all filters, by setting to non-zero value
             policy = snapshots.Policy(1, 1, 1, 1, 1)
             # mock all filters to return unqiue snapshots
-            monkeypatch.setattr(snapshot_list_fixture, "_filter_last", new_snaps)
-            monkeypatch.setattr(snapshot_list_fixture, "_filter_daily", new_snaps)
-            monkeypatch.setattr(snapshot_list_fixture, "_filter_weekly", new_snaps)
-            monkeypatch.setattr(snapshot_list_fixture, "_filter_monthly", new_snaps)
-            monkeypatch.setattr(snapshot_list_fixture, "_filter_yearly", new_snaps)
+            monkeypatch.setattr(snapshot_group_fixture, "_filter_last", new_snaps)
+            monkeypatch.setattr(snapshot_group_fixture, "_filter_daily", new_snaps)
+            monkeypatch.setattr(snapshot_group_fixture, "_filter_weekly", new_snaps)
+            monkeypatch.setattr(snapshot_group_fixture, "_filter_monthly", new_snaps)
+            monkeypatch.setattr(snapshot_group_fixture, "_filter_yearly", new_snaps)
             # verify 5 snapshots are in the output
-            assert len(snapshot_list_fixture.filter(policy)) == 5
+            assert len(snapshot_group_fixture.filter(policy)) == 5
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_no_duplicates(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_no_duplicates(self, snapshot_group_fixture):
             """snapshots which are selected by multiple filters should only appear once in the output"""
             # each filter will select one snapshot (the most recent)
             policy = snapshots.Policy(1, 1, 1, 1, 1)
-            expected = snapshot_list_fixture.snapshots[-1]
-            assert snapshot_list_fixture.filter(policy) == [expected]
+            expected = snapshot_group_fixture.snapshots[-1]
+            assert snapshot_group_fixture.filter(policy) == [expected]
 
     class TestFilterLast:
         """Tests for the _filter_last method"""
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_no_snapshots(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_no_snapshots(self, snapshot_group_fixture):
             """an empty list of snapshots should return an empty list"""
-            assert snapshot_list_fixture._filter_last(5, []) == []
+            assert snapshot_group_fixture._filter_last(5, []) == []
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_some_snapshots(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_some_snapshots(self, snapshot_group_fixture):
             """the requested number of snapshots should be returned, from the top of the list"""
-            snap_list = snapshot_list_fixture.snapshots
+            snap_list = snapshot_group_fixture.snapshots
             assert (
-                snapshot_list_fixture._filter_last(3, snap_list)
-                == snapshot_list_fixture.snapshots[:3]
+                snapshot_group_fixture._filter_last(3, snap_list)
+                == snapshot_group_fixture.snapshots[:3]
             )
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_not_enough_snapshots(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_not_enough_snapshots(self, snapshot_group_fixture):
             """if more than the total number of snapshots are requested, the entire list should be returned"""
-            # snapshot_list_fixture has 10 total snapshots
-            snap_list = snapshot_list_fixture.snapshots
-            assert len(snapshot_list_fixture._filter_last(20, snap_list)) == 10
+            # snapshot_group_fixture has 10 total snapshots
+            snap_list = snapshot_group_fixture.snapshots
+            assert len(snapshot_group_fixture._filter_last(20, snap_list)) == 10
 
     class TestFilterDaily:
         """Tests for the _filter_daily method"""
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_zero(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_zero(self, snapshot_group_fixture):
             """requesting zero snapshots should return an empty list"""
-            snap_list = snapshot_list_fixture.snapshots
-            assert snapshot_list_fixture._filter_daily(0, snap_list) == []
+            snap_list = snapshot_group_fixture.snapshots
+            assert snapshot_group_fixture._filter_daily(0, snap_list) == []
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_sequential_days(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_sequential_days(self, snapshot_group_fixture):
             """snapshots on sequential days should be returned up to the requested number"""
             snap_list = [
                 new_snapshot(datetime.date(2025, 9, 21)),
@@ -491,10 +498,10 @@ class TestSnapshotList:
                 new_snapshot(datetime.date(2025, 9, 19)),
                 new_snapshot(datetime.date(2025, 9, 18)),
             ]
-            assert snapshot_list_fixture._filter_daily(3, snap_list) == snap_list[:3]
+            assert snapshot_group_fixture._filter_daily(3, snap_list) == snap_list[:3]
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_non_sequential_days(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_non_sequential_days(self, snapshot_group_fixture):
             """snapshots on non-sequential days should be returned up to the requested number"""
             snap_list = [
                 new_snapshot(datetime.date(2025, 9, 21)),
@@ -502,10 +509,10 @@ class TestSnapshotList:
                 new_snapshot(datetime.date(2025, 9, 18)),
                 new_snapshot(datetime.date(2025, 9, 17)),
             ]
-            assert snapshot_list_fixture._filter_daily(3, snap_list) == snap_list[:3]
+            assert snapshot_group_fixture._filter_daily(3, snap_list) == snap_list[:3]
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_max_one_per_day(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_max_one_per_day(self, snapshot_group_fixture):
             """only the most recent snapshot on any given calendar day should be considered"""
             snap_list = [
                 new_snapshot(datetime.datetime(2025, 9, 21, 15, 19, 14)),
@@ -514,14 +521,14 @@ class TestSnapshotList:
                 new_snapshot(datetime.date(2025, 9, 20)),
                 new_snapshot(datetime.date(2025, 9, 19)),
             ]
-            assert snapshot_list_fixture._filter_daily(3, snap_list) == [
+            assert snapshot_group_fixture._filter_daily(3, snap_list) == [
                 snap_list[0],
                 snap_list[3],
                 snap_list[4],
             ]
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_week_boundary(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_week_boundary(self, snapshot_group_fixture):
             """snapshots should be able to span the week boundary without issue"""
             snap_list = [
                 new_snapshot(datetime.date(2025, 9, 23)),
@@ -529,10 +536,10 @@ class TestSnapshotList:
                 new_snapshot(datetime.date(2025, 9, 21)),  # sunday
                 new_snapshot(datetime.date(2025, 9, 20)),
             ]
-            assert snapshot_list_fixture._filter_daily(3, snap_list) == snap_list[:3]
+            assert snapshot_group_fixture._filter_daily(3, snap_list) == snap_list[:3]
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_month_boundary(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_month_boundary(self, snapshot_group_fixture):
             """snapshots should be able to span the month boundary without issue"""
             snap_list = [
                 new_snapshot(datetime.date(2025, 9, 23)),
@@ -540,10 +547,10 @@ class TestSnapshotList:
                 new_snapshot(datetime.date(2025, 8, 23)),
                 new_snapshot(datetime.date(2025, 8, 22)),
             ]
-            assert snapshot_list_fixture._filter_daily(3, snap_list) == snap_list[:3]
+            assert snapshot_group_fixture._filter_daily(3, snap_list) == snap_list[:3]
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_year_boundary(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_year_boundary(self, snapshot_group_fixture):
             """snapshots should be able to span the year boundary without issue"""
             snap_list = [
                 new_snapshot(datetime.date(2025, 9, 23)),
@@ -551,17 +558,17 @@ class TestSnapshotList:
                 new_snapshot(datetime.date(2024, 9, 23)),
                 new_snapshot(datetime.date(2024, 9, 22)),
             ]
-            assert snapshot_list_fixture._filter_daily(3, snap_list) == snap_list[:3]
+            assert snapshot_group_fixture._filter_daily(3, snap_list) == snap_list[:3]
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_not_enough_snapshots(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_not_enough_snapshots(self, snapshot_group_fixture):
             """if more than the total number of daily snapshots are requested, all daily snapshots should be returned"""
-            # snapshot_list_fixture has three snapshots from a single day, out of 10 total
-            snap_list = snapshot_list_fixture.snapshots
-            assert len(snapshot_list_fixture._filter_daily(10, snap_list)) == 8
+            # snapshot_group_fixture has three snapshots from a single day, out of 10 total
+            snap_list = snapshot_group_fixture.snapshots
+            assert len(snapshot_group_fixture._filter_daily(10, snap_list)) == 8
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_no_current(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_no_current(self, snapshot_group_fixture):
             """if no_current is set and a snapshot lies within the current time period, it should be excluded"""
             snap_list = [
                 new_snapshot(datetime.datetime(2025, 9, 21)),
@@ -570,7 +577,7 @@ class TestSnapshotList:
                 new_snapshot(datetime.datetime(2025, 9, 18)),
             ]
             assert (
-                snapshot_list_fixture._filter_daily(
+                snapshot_group_fixture._filter_daily(
                     3,
                     snap_list,
                     no_current=True,
@@ -579,8 +586,8 @@ class TestSnapshotList:
                 == snap_list[1:]
             )
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_snapshot_timezone_primacy(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_snapshot_timezone_primacy(self, snapshot_group_fixture):
             """
             the timezone recorded in the snapshot should have primacy when determining in which period the snapshot falls
             e.g. 2018-11-03T01:38:41+01:00, and 2018-11-04T01:38:41+06:00, should be considered as having been taken on different days.
@@ -611,21 +618,21 @@ class TestSnapshotList:
                 ),
             ]
             assert (
-                len(snapshot_list_fixture._filter_daily(2, snap_list, no_current=True))
+                len(snapshot_group_fixture._filter_daily(2, snap_list, no_current=True))
                 == 2
             )
 
     class TestFilterWeekly:
         """Tests for the _filter_weekly method"""
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_zero(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_zero(self, snapshot_group_fixture):
             """requesting zero snapshots should return an empty list"""
-            snap_list = snapshot_list_fixture.snapshots
-            assert snapshot_list_fixture._filter_weekly(0, snap_list) == []
+            snap_list = snapshot_group_fixture.snapshots
+            assert snapshot_group_fixture._filter_weekly(0, snap_list) == []
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_sequential_weeks(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_sequential_weeks(self, snapshot_group_fixture):
             """snapshots on sequential weeks should be returned up to the requested number"""
             snap_list = [
                 new_snapshot(datetime.date(2025, 9, 29)),
@@ -634,10 +641,10 @@ class TestSnapshotList:
                 new_snapshot(datetime.date(2025, 9, 8)),
             ]
 
-            assert snapshot_list_fixture._filter_weekly(3, snap_list) == snap_list[:3]
+            assert snapshot_group_fixture._filter_weekly(3, snap_list) == snap_list[:3]
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_non_sequential_weeks(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_non_sequential_weeks(self, snapshot_group_fixture):
             """snapshots on non-sequential weeks should be returned up to the requested number"""
             snap_list = [
                 new_snapshot(datetime.date(2025, 9, 29)),
@@ -645,10 +652,10 @@ class TestSnapshotList:
                 new_snapshot(datetime.date(2025, 9, 8)),
                 new_snapshot(datetime.date(2025, 9, 1)),
             ]
-            assert snapshot_list_fixture._filter_weekly(3, snap_list) == snap_list[:3]
+            assert snapshot_group_fixture._filter_weekly(3, snap_list) == snap_list[:3]
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_max_one_per_week(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_max_one_per_week(self, snapshot_group_fixture):
             """only the most recent snapshot from any given calendar week should be considered"""
             snap_list = [
                 new_snapshot(datetime.date(2025, 9, 30)),  # week 4
@@ -657,14 +664,14 @@ class TestSnapshotList:
                 new_snapshot(datetime.date(2025, 9, 22)),  # week 3
                 new_snapshot(datetime.date(2025, 9, 21)),  # week 2
             ]
-            assert snapshot_list_fixture._filter_weekly(3, snap_list) == [
+            assert snapshot_group_fixture._filter_weekly(3, snap_list) == [
                 snap_list[0],
                 snap_list[1],
                 snap_list[4],
             ]
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_month_boundary(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_month_boundary(self, snapshot_group_fixture):
             """snapshots should be able to span the month boundary without issue"""
             snap_list = [
                 new_snapshot(datetime.date(2025, 9, 23)),
@@ -672,10 +679,10 @@ class TestSnapshotList:
                 new_snapshot(datetime.date(2025, 8, 23)),
                 new_snapshot(datetime.date(2025, 8, 10)),
             ]
-            assert snapshot_list_fixture._filter_weekly(3, snap_list) == snap_list[:3]
+            assert snapshot_group_fixture._filter_weekly(3, snap_list) == snap_list[:3]
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_year_boundary(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_year_boundary(self, snapshot_group_fixture):
             """snapshots should be able to span the year boundary without issue"""
             snap_list = [
                 new_snapshot(datetime.date(2025, 9, 23)),
@@ -683,17 +690,17 @@ class TestSnapshotList:
                 new_snapshot(datetime.date(2024, 9, 23)),
                 new_snapshot(datetime.date(2024, 9, 10)),
             ]
-            assert snapshot_list_fixture._filter_weekly(3, snap_list) == snap_list[:3]
+            assert snapshot_group_fixture._filter_weekly(3, snap_list) == snap_list[:3]
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_not_enough_snapshots(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_not_enough_snapshots(self, snapshot_group_fixture):
             """if more than the total number of weekly snapshots are requested, all weekly snapshots should be returned"""
-            # snapshot_list_fixture has 5 snapshots from unique weeks, out of 10 total
-            snap_list = snapshot_list_fixture.snapshots
-            assert len(snapshot_list_fixture._filter_weekly(10, snap_list)) == 5
+            # snapshot_group_fixture has 5 snapshots from unique weeks, out of 10 total
+            snap_list = snapshot_group_fixture.snapshots
+            assert len(snapshot_group_fixture._filter_weekly(10, snap_list)) == 5
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_no_current(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_no_current(self, snapshot_group_fixture):
             """if no_current is set and a snapshot lies within the current time period, it should be excluded"""
             snap_list = [
                 new_snapshot(datetime.date(2025, 9, 29)),
@@ -702,7 +709,7 @@ class TestSnapshotList:
                 new_snapshot(datetime.date(2025, 9, 8)),
             ]
             assert (
-                snapshot_list_fixture._filter_weekly(
+                snapshot_group_fixture._filter_weekly(
                     3,
                     snap_list,
                     no_current=True,
@@ -711,8 +718,8 @@ class TestSnapshotList:
                 == snap_list[1:]
             )
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_snapshot_timezone_primacy(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_snapshot_timezone_primacy(self, snapshot_group_fixture):
             """
             the timezone recorded in the snapshot should have primacy when determining in which period the snapshot falls
             e.g. 2018-11-03T01:38:41+01:00, and 2018-11-04T01:38:41+06:00, should be considered as having been taken on different days.
@@ -743,21 +750,23 @@ class TestSnapshotList:
                 ),
             ]
             assert (
-                len(snapshot_list_fixture._filter_weekly(2, snap_list, no_current=True))
+                len(
+                    snapshot_group_fixture._filter_weekly(2, snap_list, no_current=True)
+                )
                 == 2
             )
 
     class TestFilterMonthly:
         """Tests for the _filter_monthly method"""
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_zero(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_zero(self, snapshot_group_fixture):
             """requesting zero snapshots should return an empty list"""
-            snap_list = snapshot_list_fixture.snapshots
-            assert snapshot_list_fixture._filter_monthly(0, snap_list) == []
+            snap_list = snapshot_group_fixture.snapshots
+            assert snapshot_group_fixture._filter_monthly(0, snap_list) == []
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_sequential_months(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_sequential_months(self, snapshot_group_fixture):
             """snapshots on sequential months should be returned up to the requested number"""
             snap_list = [
                 new_snapshot(datetime.date(2025, 9, 29)),
@@ -766,10 +775,10 @@ class TestSnapshotList:
                 new_snapshot(datetime.date(2025, 5, 31)),
             ]
 
-            assert snapshot_list_fixture._filter_monthly(3, snap_list) == snap_list[:3]
+            assert snapshot_group_fixture._filter_monthly(3, snap_list) == snap_list[:3]
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_non_sequential_months(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_non_sequential_months(self, snapshot_group_fixture):
             """snapshots on non-sequential months should be returned up to the requested number"""
             snap_list = [
                 new_snapshot(datetime.date(2025, 9, 29)),
@@ -777,10 +786,10 @@ class TestSnapshotList:
                 new_snapshot(datetime.date(2025, 4, 19)),
                 new_snapshot(datetime.date(2025, 3, 1)),
             ]
-            assert snapshot_list_fixture._filter_monthly(3, snap_list) == snap_list[:3]
+            assert snapshot_group_fixture._filter_monthly(3, snap_list) == snap_list[:3]
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_max_one_per_month(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_max_one_per_month(self, snapshot_group_fixture):
             """only the most recent snapshot from any given calendar month should be considered"""
             snap_list = [
                 new_snapshot(datetime.date(2025, 9, 30)),
@@ -789,14 +798,14 @@ class TestSnapshotList:
                 new_snapshot(datetime.date(2025, 8, 11)),
                 new_snapshot(datetime.date(2025, 7, 6)),
             ]
-            assert snapshot_list_fixture._filter_monthly(3, snap_list) == [
+            assert snapshot_group_fixture._filter_monthly(3, snap_list) == [
                 snap_list[0],
                 snap_list[3],
                 snap_list[4],
             ]
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_year_boundary(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_year_boundary(self, snapshot_group_fixture):
             """snapshots should be able to span the year boundary without issue"""
             snap_list = [
                 new_snapshot(datetime.date(2025, 9, 23)),
@@ -804,17 +813,17 @@ class TestSnapshotList:
                 new_snapshot(datetime.date(2024, 9, 23)),
                 new_snapshot(datetime.date(2024, 8, 11)),
             ]
-            assert snapshot_list_fixture._filter_monthly(3, snap_list) == snap_list[:3]
+            assert snapshot_group_fixture._filter_monthly(3, snap_list) == snap_list[:3]
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_not_enough_snapshots(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_not_enough_snapshots(self, snapshot_group_fixture):
             """if more than the total number of monthly snapshots are requested, all monthly snapshots should be returned"""
-            # snapshot_list_fixture has 4 snapshots from unique months, out of 10 total
-            snap_list = snapshot_list_fixture.snapshots
-            assert len(snapshot_list_fixture._filter_monthly(10, snap_list)) == 4
+            # snapshot_group_fixture has 4 snapshots from unique months, out of 10 total
+            snap_list = snapshot_group_fixture.snapshots
+            assert len(snapshot_group_fixture._filter_monthly(10, snap_list)) == 4
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_no_current(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_no_current(self, snapshot_group_fixture):
             """if no_current is set and a snapshot lies within the current time period, it should be excluded"""
             snap_list = [
                 new_snapshot(datetime.date(2025, 9, 29)),
@@ -823,7 +832,7 @@ class TestSnapshotList:
                 new_snapshot(datetime.date(2025, 5, 31)),
             ]
             assert (
-                snapshot_list_fixture._filter_monthly(
+                snapshot_group_fixture._filter_monthly(
                     3,
                     snap_list,
                     no_current=True,
@@ -832,8 +841,8 @@ class TestSnapshotList:
                 == snap_list[1:]
             )
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_snapshot_timezone_primacy(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_snapshot_timezone_primacy(self, snapshot_group_fixture):
             """
             the timezone recorded in the snapshot should have primacy when determining in which period the snapshot falls
             e.g. 2018-11-03T01:38:41+01:00, and 2018-11-04T01:38:41+06:00, should be considered as having been taken on different days.
@@ -865,7 +874,9 @@ class TestSnapshotList:
             ]
             assert (
                 len(
-                    snapshot_list_fixture._filter_monthly(2, snap_list, no_current=True)
+                    snapshot_group_fixture._filter_monthly(
+                        2, snap_list, no_current=True
+                    )
                 )
                 == 2
             )
@@ -873,14 +884,14 @@ class TestSnapshotList:
     class TestFilterYearly:
         """Tests for the _filter_yearly method"""
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_zero(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_zero(self, snapshot_group_fixture):
             """requesting zero snapshots should return an empty list"""
-            snap_list = snapshot_list_fixture.snapshots
-            assert snapshot_list_fixture._filter_yearly(0, snap_list) == []
+            snap_list = snapshot_group_fixture.snapshots
+            assert snapshot_group_fixture._filter_yearly(0, snap_list) == []
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_sequential_years(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_sequential_years(self, snapshot_group_fixture):
             """snapshots on sequential years should be returned up to the requested number"""
             snap_list = [
                 new_snapshot(datetime.date(2025, 9, 29)),
@@ -889,10 +900,10 @@ class TestSnapshotList:
                 new_snapshot(datetime.date(2022, 5, 31)),
             ]
 
-            assert snapshot_list_fixture._filter_yearly(3, snap_list) == snap_list[:3]
+            assert snapshot_group_fixture._filter_yearly(3, snap_list) == snap_list[:3]
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_non_sequential_years(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_non_sequential_years(self, snapshot_group_fixture):
             """snapshots on non-sequential years should be returned up to the requested number"""
             snap_list = [
                 new_snapshot(datetime.date(2025, 9, 29)),
@@ -900,10 +911,10 @@ class TestSnapshotList:
                 new_snapshot(datetime.date(2021, 3, 4)),
                 new_snapshot(datetime.date(2020, 11, 15)),
             ]
-            assert snapshot_list_fixture._filter_yearly(3, snap_list) == snap_list[:3]
+            assert snapshot_group_fixture._filter_yearly(3, snap_list) == snap_list[:3]
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_max_one_per_year(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_max_one_per_year(self, snapshot_group_fixture):
             """only the most recent snapshot from any given calendar year should be considered"""
             snap_list = [
                 new_snapshot(datetime.date(2025, 9, 30)),
@@ -912,21 +923,21 @@ class TestSnapshotList:
                 new_snapshot(datetime.date(2024, 9, 23)),
                 new_snapshot(datetime.date(2023, 7, 6)),
             ]
-            assert snapshot_list_fixture._filter_yearly(3, snap_list) == [
+            assert snapshot_group_fixture._filter_yearly(3, snap_list) == [
                 snap_list[0],
                 snap_list[3],
                 snap_list[4],
             ]
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_not_enough_snapshots(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_not_enough_snapshots(self, snapshot_group_fixture):
             """if more than the total number of yearly snapshots are requested, all yearly snapshots should be returned"""
-            # snapshot_list_fixture has 2 snapshots from unique years, out of 10 total
-            snap_list = snapshot_list_fixture.snapshots
-            assert len(snapshot_list_fixture._filter_yearly(10, snap_list)) == 2
+            # snapshot_group_fixture has 2 snapshots from unique years, out of 10 total
+            snap_list = snapshot_group_fixture.snapshots
+            assert len(snapshot_group_fixture._filter_yearly(10, snap_list)) == 2
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_no_current(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_no_current(self, snapshot_group_fixture):
             """if no_current is set and a snapshot lies within the current time period, it should be excluded"""
             snap_list = [
                 new_snapshot(datetime.date(2025, 9, 29)),
@@ -935,7 +946,7 @@ class TestSnapshotList:
                 new_snapshot(datetime.date(2022, 5, 31)),
             ]
             assert (
-                snapshot_list_fixture._filter_yearly(
+                snapshot_group_fixture._filter_yearly(
                     3,
                     snap_list,
                     no_current=True,
@@ -944,8 +955,8 @@ class TestSnapshotList:
                 == snap_list[1:]
             )
 
-        @pytest.mark.usefixtures("snapshot_list_fixture")
-        def test_snapshot_timezone_primacy(self, snapshot_list_fixture):
+        @pytest.mark.usefixtures("snapshot_group_fixture")
+        def test_snapshot_timezone_primacy(self, snapshot_group_fixture):
             """
             the timezone recorded in the snapshot should have primacy when determining in which period the snapshot falls
             e.g. 2018-11-03T01:38:41+01:00, and 2018-11-04T01:38:41+06:00, should be considered as having been taken on different days.
@@ -976,6 +987,179 @@ class TestSnapshotList:
                 ),
             ]
             assert (
-                len(snapshot_list_fixture._filter_yearly(2, snap_list, no_current=True))
+                len(
+                    snapshot_group_fixture._filter_yearly(2, snap_list, no_current=True)
+                )
                 == 2
             )
+
+
+class TestSnapshotList:
+    """Tests for the class snapshots.SnapshotList"""
+
+    class TestIsGrouped:
+        """Tests for the is_grouped method"""
+
+        def test_is_grouped(self):
+            grouped_data = [
+                {
+                    "group_key": {"hostname": "server.local"},
+                    "snapshots": [{"time": "2025-09-22T15:19:14.968650111+01:00"}],
+                },
+            ]
+            ungrouped_data = [{"time": "2025-09-22T15:19:14.968650111+01:00"}]
+
+            assert snapshots.SnapshotList.is_grouped(grouped_data) is True
+            assert snapshots.SnapshotList.is_grouped(ungrouped_data) is False
+
+    class TestFromJson:
+        """Tests for the from_json method"""
+
+        # we need to test... grouped vs ungrouped
+
+        @pytest.mark.usefixtures("snapshot_fixture")
+        def test_grouped_ingest(self, snapshot_fixture):
+            """json should be parsed and return valid snapshotlist, snapshotgroup and snapshot instances"""
+            # fmt: off
+            data = textwrap.dedent(
+                "["
+                    "{"
+                        '"group_key": {'
+                            '"hostname":"server.local",'
+                            '"paths":["/etc/hosts"],'
+                            '"tags":null'
+                        "},"
+                        '"snapshots": ['
+                            "{"
+                                '"time":"2025-09-22T15:19:14.968650111+01:00",'
+                                '"parent": "ef699e0b81670666e639c0271b09edc6b4e3158277e3dd1c0d72809b44c468f1",'
+                                '"tree":"a9c65ce7565f9e7456606dd0119ab186ba5aefc6fb883f433e7a6b406c0f6771",'
+                                '"paths":["/etc/hosts"],'
+                                '"hostname":"server.local",'
+                                '"username":"user",'
+                                '"uid":1000,'
+                                '"gid":1000,'
+                                '"excludes": ["/etc/nothosts"],'
+                                '"tags": ["rewrite"],'
+                                '"original": "e2adfd3564420f9447d42337356100a168dbf9c1de25b3086fbdc9c4a18ba4a1",'
+                                '"program_version":"restic 0.18.0",'
+                                '"summary": {'
+                                    '"backup_start": "2025-09-22T15:19:14.968650111+01:00",'
+                                    '"backup_end": "2025-09-22T15:19:15.693199959+01:00",'
+                                    '"files_new": 1,'
+                                    '"files_changed": 0,'
+                                    '"files_unmodified": 0,'
+                                    '"dirs_new": 1,'
+                                    '"dirs_changed": 0,'
+                                    '"dirs_unmodified": 0,'
+                                    '"data_blobs": 1,'
+                                    '"tree_blobs": 2,'
+                                    '"data_added": 1288,'
+                                    '"data_added_packed": 1028,'
+                                    '"total_files_processed": 1,'
+                                    '"total_bytes_processed": 384'
+                                "},"
+                                '"id":"13fc6fb1a3ce4ba6a693bc7e0f6f651394e0699db4c38080c2f7c1fabe5210b2",'
+                                '"short_id":"13fc6fb1"'
+                            "}"
+                        "]"
+                    '},'
+                    "{"
+                        '"group_key": {'
+                            '"hostname":"server.local",'
+                            '"paths":["/etc/hosts"],'
+                            '"tags":["foo"]'
+                        "},"
+                        '"snapshots": ['
+                            "{"
+                                '"time":"2026-06-20T15:34:13.12153411+01:00",'
+                                '"parent":"4c8d55ac0035687cd64066661c75bf3eab8ea4c40354a24ba1d3eeaf4c22edf9",'
+                                '"tree":"ccd3177ddcf236f6ed56b428ba707494f98ce4bb7507076bdc49319f5157ac7a",'
+                                '"paths":["/etc/hosts"],'
+                                '"hostname":"server.local",'
+                                '"username":"user",'
+                                '"uid":1000,'
+                                '"gid":1000,'
+                                '"tags":["foo"],'
+                                '"program_version":"restic 0.18.1",'
+                                '"summary": {'
+                                    '"backup_start":"2026-06-20T15:34:13.12153411+01:00",'
+                                    '"backup_end":"2026-06-20T15:34:17.067839216+01:00",'
+                                    '"files_new":0,'
+                                    '"files_changed":0,'
+                                    '"files_unmodified":1,'
+                                    '"dirs_new":0,'
+                                    '"dirs_changed":0,'
+                                    '"dirs_unmodified":1,'
+                                    '"data_blobs":0,'
+                                    '"tree_blobs":0,'
+                                    '"data_added":0,'
+                                    '"data_added_packed":0,'
+                                    '"total_files_processed":1,'
+                                    '"total_bytes_processed":384'
+                                "},"
+                                '"id":"3733c0e3e47f1cd367d389a9bab29d8f30213d6e07a18a4dcebc5501dafe6636",'
+                                '"short_id":"3733c0e3"'
+                            "}"
+                        "]"
+                    "}"
+                ']'
+            )
+            # fmt: on
+            snap_list = snapshots.SnapshotList.from_json(data)
+            assert len(snap_list.snapshot_groups) == 2
+            for item in snap_list.snapshot_groups:
+                assert isinstance(item, snapshots.SnapshotGroup)
+            assert snap_list.snapshot_groups[0].snapshots == [snapshot_fixture]
+
+        @pytest.mark.usefixtures("snapshot_fixture")
+        def test_ungrouped_ingest(self, snapshot_fixture):
+            """json should be parsed and return valid snapshotlist and snapshot instances"""
+            # fmt: off
+            data = textwrap.dedent(
+                "["
+                    "{"
+                        '"time":"2025-09-22T15:19:14.968650111+01:00",'
+                        '"parent": "ef699e0b81670666e639c0271b09edc6b4e3158277e3dd1c0d72809b44c468f1",'
+                        '"tree":"a9c65ce7565f9e7456606dd0119ab186ba5aefc6fb883f433e7a6b406c0f6771",'
+                        '"paths":["/etc/hosts"],'
+                        '"hostname":"server.local",'
+                        '"username":"user",'
+                        '"uid":1000,'
+                        '"gid":1000,'
+                        '"excludes": ["/etc/nothosts"],'
+                        '"tags": ["rewrite"],'
+                        '"original": "e2adfd3564420f9447d42337356100a168dbf9c1de25b3086fbdc9c4a18ba4a1",'
+                        '"program_version":"restic 0.18.0",'
+                        '"summary": {'
+                            '"backup_start": "2025-09-22T15:19:14.968650111+01:00",'
+                            '"backup_end": "2025-09-22T15:19:15.693199959+01:00",'
+                            '"files_new": 1,'
+                            '"files_changed": 0,'
+                            '"files_unmodified": 0,'
+                            '"dirs_new": 1,'
+                            '"dirs_changed": 0,'
+                            '"dirs_unmodified": 0,'
+                            '"data_blobs": 1,'
+                            '"tree_blobs": 2,'
+                            '"data_added": 1288,'
+                            '"data_added_packed": 1028,'
+                            '"total_files_processed": 1,'
+                            '"total_bytes_processed": 384'
+                        "},"
+                        '"id":"13fc6fb1a3ce4ba6a693bc7e0f6f651394e0699db4c38080c2f7c1fabe5210b2",'
+                        '"short_id":"13fc6fb1"'
+                    "}"
+                "]"
+            )
+            # fmt: on
+            snap_list = snapshots.SnapshotList.from_json(data)
+            assert len(snap_list.snapshot_groups) == 1
+            for item in snap_list.snapshot_groups:
+                assert isinstance(item, snapshots.SnapshotGroup)
+            assert snap_list.snapshot_groups[0].snapshots == [snapshot_fixture]
+
+        def test_null_ingest(self):
+            """empty json data should return an empty snapshotlist instance"""
+            data = "[]"
+            assert snapshots.SnapshotList.from_json(data).snapshot_groups == []

@@ -1,14 +1,13 @@
 from datetime import datetime
-
 import pytest
 
-from restic_replica.snapshots import SnapshotList, GroupKey, SnapshotGroup
+from restic_replica.snapshots import SnapshotGroup
 from tests.utils import new_snapshot
 
 
 @pytest.fixture
-def snapshot_list_fixture():
-    snap_group1 = SnapshotGroup(
+def snapshot_group_fixture():
+    return SnapshotGroup(
         [
             new_snapshot(datetime.fromisoformat("2023-12-31T15:19:14.968650111+01:00")),
             new_snapshot(datetime.fromisoformat("2025-04-04T15:19:14.968650111+01:00")),
@@ -20,14 +19,5 @@ def snapshot_list_fixture():
             new_snapshot(datetime.fromisoformat("2025-09-21T07:01:42.000000000+01:00")),
             new_snapshot(datetime.fromisoformat("2025-09-21T10:34:09.000000000+01:00")),
             new_snapshot(datetime.fromisoformat("2025-09-21T15:19:14.968650111+01:00")),
-        ],
-        GroupKey("server.local", ["/etc/hosts"]),
+        ]
     )
-    snap_group2 = SnapshotGroup(
-        [
-            new_snapshot(datetime.fromisoformat("2026-06-19T15:34:13.12153411+01:00")),
-            new_snapshot(datetime.fromisoformat("2026-06-20T15:34:13.12153411+01:00")),
-        ],
-        GroupKey(),
-    )
-    return SnapshotList([snap_group1, snap_group2])

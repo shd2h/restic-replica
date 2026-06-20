@@ -1,15 +1,21 @@
 import importlib.resources
 import logging
-from pathlib import Path
 import platform
 import shutil
-from subprocess import CalledProcessError, CompletedProcess
 import tomllib
+from pathlib import Path
+from subprocess import CalledProcessError, CompletedProcess
 from typing import Optional
 
 from restic_replica import __assets__
 from restic_replica.repository import Repository, ResticCli
-from restic_replica.snapshots import Policy, SnapshotList
+from restic_replica.snapshots import (
+    Policy,
+    SnapshotFilterOptions,
+    SnapshotGroupByOptions,
+    SnapshotGroup,
+    SnapshotList,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -258,20 +264,58 @@ def check_repository_access(repository: Repository) -> bool:
         raise RuntimeError(f"Unable to access restic repository {repository}") from err
 
 
-def get_filtered_snapshots(repository: Repository, policy: Policy) -> SnapshotList:
-    """"""
-    snaps = SnapshotList.from_json(repository.snapshots(json=True).stdout)
-    filtered_snaps = SnapshotList(snaps.filter(policy))
-    if len(filtered_snaps.snapshots) > 0:
-        return filtered_snaps
-    else:
-        raise RuntimeError("snapshot filtering led to 0 snapshots to copy")
+def get_snapshots(
+    repository: Repository,
+    group_by: Optional[SnapshotGroupByOptions] = None,
+    snap_filter: Optional[SnapshotFilterOptions] = None,
+) -> SnapshotList:
+    """
+    Return a SnapshotList containing information about snapshots in a repository,
+    optionally grouped, and filtered by restic.
+
+    Args:
+        repository: the Repository instance to check access for
+        group_by: the grouping options to pass to restic
+        snap_filter: the filtering options to pass to restic
+
+    Returns:
+        a populated SnapshotList instance
+    """
+    return SnapshotList.from_json(
+        repository.snapshots(
+            json=True, group_by=group_by, snap_filter=snap_filter
+        ).stdout
+    )
+
+
+def apply_policy(
+    snapshots: SnapshotList,
+    policy: Policy,
+) -> SnapshotList:
+    """
+    Apply a policy to filter the snapshots in a SnapshotList instance.
+
+    Args:
+        repository: the Repository instance to check access for
+        policy: the Policy to be applied
+
+    Returns:
+        a filtered SnapshotList instance
+    """
+    filtered_snaps = []
+    for group in snapshots.snapshot_groups:
+        f_group = group.filter(policy)
+        if len(f_group) > 0:
+            filtered_snaps.append(SnapshotGroup(f_group))
+    return SnapshotList(snapshot_groups=filtered_snaps)
 
 
 def copy_snapshots(
     source_repository: Repository,
     destination_repository: Repository,
     policy: Optional[Policy] = None,
+    group_by: Optional[SnapshotGroupByOptions] = None,
+    snap_filter: Optional[SnapshotFilterOptions] = None,
     dry_run: bool = False,
 ) -> CompletedProcess:
     """
@@ -281,6 +325,8 @@ def copy_snapshots(
         source_repository: the Repository instance snapshots will be copied _from_
         destination_repository: the Repository instance snapshots will be copied _to_
         policy: an optional Policy instance that will be applied to filter the list of snapshots that will be copied
+        group_by: how the snapshots should be grouped before applying policy to each group (see `restic snapshots --group-by`)
+        snap_filter: optionally filter the snapshots that will be copied by host, path, and/or tags (see `restic snapshots --host, --path, and --tag`)
         dry_run: whether to actually perform the copy operation or not
 
     Returns:
@@ -291,28 +337,43 @@ def copy_snapshots(
         SystemExit: raised instead of performing the copy process, if dry_run is set
     """
     try:
+        # retrieve the list of snaps from the source
+        snapshots = get_snapshots(source_repository, group_by, snap_filter)
+        if len(snapshots.snapshot_groups) == 0:
+            # TODO: we can also get 0 if user applied host/path/tag filtering, so this error is misleading
+            raise RuntimeError(
+                f"no snapshots in restic repository: `{source_repository}`"
+            )
+
+        # if the user specified a filtering policy at the application level, apply it
         if policy:
             logger.info(
-                f"Filtering snapshots to be copied from source repository using policy: {policy}"
+                f"Filtering snapshot group(s) to be copied from source repository using policy: {policy}"
             )
-            filtered_snapshots = get_filtered_snapshots(source_repository, policy)
-            logger.info(f"The following snapshots will be copied: {filtered_snapshots}")
+            f_snapshots = apply_policy(snapshots, policy)
+            if len(f_snapshots.snapshot_groups) == 0:
+                raise RuntimeError(
+                    f"no snapshots left to copy after applying policy: `{policy}`"
+                )
+            # TODO: SnapshotList doesn't have a __str__ method yet.
+            logger.info(f"The following snapshots will be copied: {snapshots}")
         else:
+            f_snapshots = None
             logger.info(
                 "No policy specified, all snapshots will be copied from the source repository"
             )
-            filtered_snapshots = None
+
         if dry_run:
             logger.info("dry-run flag set, exiting without performing copy operation")
             raise SystemExit(0)
         else:
             logger.info(
-                f"Starting copy of snapshots from {source_repository.uri} to {destination_repository.uri}"
+                f"Starting copy of snapshots from {source_repository} to {destination_repository}"
             )
             return destination_repository.copy(
                 source_repository,
                 live_output=True,
-                snapshots=filtered_snapshots,
+                snapshots=f_snapshots,
             )
     except (CalledProcessError, OSError) as err:
         if isinstance(err, CalledProcessError):

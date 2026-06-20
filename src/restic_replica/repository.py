@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Optional, Self
 
 from restic_replica.snapshots import (
+    SnapshotList,
     SnapshotFilterOptions,
     SnapshotGroupByOptions,
 )
@@ -358,10 +359,11 @@ class Repository:
         args = self._common_args()
         args.extend(["copy", "--from-repo", other.uri])
 
-        # extend copy with list of snapshots
+        # extend copy with snapshots from each snapshot group
         if snapshots:
-            for snapshot in snapshots.snapshots:
-                args.append(snapshot.id)
+            for snapshot_group in snapshots.snapshot_groups:
+                for snapshot in snapshot_group.snapshots:
+                    args.append(snapshot.id)
 
         return self.restic_cli.execute(
             args,

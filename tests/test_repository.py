@@ -636,7 +636,13 @@ class TestRepository:
         ):
             """supplying a snapshot list should result in all snapshot IDs being appended to args"""
 
-            expected_ids = [i.id for i in snapshot_list_fixture.snapshots]
+            # this doesn't check that it iterates though...
+            expected_ids = [
+                i.id for i in snapshot_list_fixture.snapshot_groups[0].snapshots
+            ]
+            expected_ids.extend(
+                [i.id for i in snapshot_list_fixture.snapshot_groups[1].snapshots]
+            )
             with mock.patch.object(
                 repository_fixture.restic_cli,
                 "execute",
