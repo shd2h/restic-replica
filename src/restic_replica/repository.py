@@ -1,12 +1,15 @@
 import copy
-from dataclasses import dataclass
 import logging
 import os
-from pathlib import Path
 import subprocess
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional, Self
 
-from restic_replica.snapshots import SnapshotList
+from restic_replica.snapshots import (
+    SnapshotFilterOptions,
+    SnapshotGroupByOptions,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -267,7 +270,11 @@ class Repository:
             return True
 
     def snapshots(
-        self, live_output: bool = False, json: bool = False
+        self,
+        live_output: bool = False,
+        json: bool = False,
+        group_by: Optional[SnapshotGroupByOptions] = None,
+        snap_filter: Optional[SnapshotFilterOptions] = None,
     ) -> subprocess.CompletedProcess:
         """
         List the snapshots stored in this repository.
@@ -275,6 +282,8 @@ class Repository:
         Args:
             live_output: emit restic program output line-by-line
             json: set restic program output mode to json
+            group_by: set snapshot grouping
+            filter: set snapshot host/path/tag filters
 
         Returns:
            a subprocess.CompletedProcess object containing the exit code, stdout and
@@ -284,6 +293,15 @@ class Repository:
         # execute restic CLI with the snapshots argument
         args = self._common_args()
         args.extend(["snapshots"])
+        if group_by:
+            args.extend([f"--group-by={str(group_by)}"])
+        if snap_filter:
+            if snap_filter.host:
+                args.extend([f"--host={snap_filter.host}"])
+            if snap_filter.path:
+                args.extend([f"--path={snap_filter.path}"])
+            if snap_filter.tag:
+                args.extend([f"--tag={','.join(snap_filter.tag)}"])
         return self.restic_cli.execute(
             args,
             environment_vars=self.environment_vars,

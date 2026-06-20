@@ -1,11 +1,13 @@
-from contextlib import nullcontext as does_not_raise
 import logging
 import os
-import pytest
 import subprocess
+from contextlib import nullcontext as does_not_raise
 from unittest import mock
 
+import pytest
+
 from restic_replica import repository
+from restic_replica.snapshots import SnapshotFilterOptions, SnapshotGroupByOptions
 
 
 class TestResticCli:
@@ -376,6 +378,63 @@ class TestRepository:
             ):
                 assert repository_fixture.snapshots()["json"] is False
                 assert repository_fixture.snapshots(json=True)["json"] is True
+
+        @pytest.mark.usefixtures("repository_fixture")
+        def test_group_by(self, repository_fixture):
+            """group_by should not be set by default"""
+            test_group = SnapshotGroupByOptions()
+            with mock.patch.object(
+                repository_fixture.restic_cli,
+                "execute",
+                self.return_args,
+            ):
+                assert repository_fixture.snapshots() == (
+                    [
+                        "-r",
+                        f"{repository_fixture.uri}",
+                        "snapshots",
+                    ],
+                )
+                assert repository_fixture.snapshots(group_by=test_group) == (
+                    [
+                        "-r",
+                        f"{repository_fixture.uri}",
+                        "snapshots",
+                        "--group-by=host,path",
+                    ],
+                )
+
+        @pytest.mark.usefixtures("repository_fixture")
+        @pytest.mark.parametrize(
+            "filter, expectation",
+            [
+                (None, []),
+                (SnapshotFilterOptions(host="system"), ["--host=system"]),
+                (SnapshotFilterOptions(path="/home"), ["--path=/home"]),
+                (SnapshotFilterOptions(tag=["foo", "bar"]), ["--tag=foo,bar"]),
+                (
+                    SnapshotFilterOptions(
+                        host="system", path="/home", tag=["foo", "bar"]
+                    ),
+                    ["--host=system", "--path=/home", "--tag=foo,bar"],
+                ),
+            ],
+        )
+        def test_snap_filter(self, repository_fixture, filter, expectation):
+            """snap_filter should not be set by default"""
+            with mock.patch.object(
+                repository_fixture.restic_cli,
+                "execute",
+                self.return_args,
+            ):
+                assert repository_fixture.snapshots(snap_filter=filter) == (
+                    [
+                        "-r",
+                        f"{repository_fixture.uri}",
+                        "snapshots",
+                    ]
+                    + expectation,
+                )
 
     class TestCopy:
         """Tests for the copy method"""
