@@ -32,6 +32,8 @@ class TestMain:
             lambda *args, **kwargs: {
                 "restic": {},
                 "policy": {},
+                "grouping": {},
+                "filters": {},
                 "source": {},
                 "destination": {},
             },
@@ -67,6 +69,18 @@ class TestMain:
     def mock_get_policy(self, monkeypatch):
         monkeypatch.setattr(
             "restic_replica.app.get_policy", lambda *args, **kwargs: None
+        )
+
+    @pytest.fixture(autouse=True)
+    def mock_get_group_by(self, monkeypatch):
+        monkeypatch.setattr(
+            "restic_replica.app.get_group_by", lambda *args, **kwargs: None
+        )
+
+    @pytest.fixture(autouse=True)
+    def mock_get_snap_filter(self, monkeypatch):
+        monkeypatch.setattr(
+            "restic_replica.app.get_snap_filter", lambda *args, **kwargs: None
         )
 
     @pytest.fixture(autouse=True)

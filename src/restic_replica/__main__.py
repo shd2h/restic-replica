@@ -14,6 +14,10 @@ def main(argv=sys.argv[1:]):
         restic_cli = app.get_restic(config["restic"], verbose=args.verbose)
         # read policy info from file
         policy = app.get_policy(config["policy"])
+        # read grouping info from file
+        group_by = app.get_group_by(config["grouping"])
+        # read filters info from file
+        snap_filter = app.get_snap_filter(config["filters"])
         # instance source and target repositories
         source = app.get_repository("source", config["source"], restic_cli)
         destination = app.get_repository("target", config["destination"], restic_cli)
@@ -23,7 +27,9 @@ def main(argv=sys.argv[1:]):
         logger.info(f"Checking access to destination repository: {destination.uri}")
         app.check_repository_access(destination)
         # perform snapshot copy operation
-        result = app.copy_snapshots(source, destination, policy, dry_run=args.dry_run)
+        result = app.copy_snapshots(
+            source, destination, policy, group_by, snap_filter, dry_run=args.dry_run
+        )
         if not result.stdout:
             logger.info(
                 "All snapshots from the source are already present in the destination repository"
