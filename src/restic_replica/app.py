@@ -198,6 +198,54 @@ def get_policy(config: dict) -> Optional[Policy]:
         return None
 
 
+def get_group_by(config: dict) -> Optional[SnapshotGroupByOptions]:
+    """
+    Return a SnapshotGroupByOptions instance populated with the information from config
+
+    Args:
+        config: group-by configuration dictionary
+
+    Returns:
+        a populated SnapshotGroupByOptions instance
+
+    Raises:
+        TypeError: raised if invalid group-by options are set in the config.
+    """
+    for item in config:
+        if not isinstance(config[item], bool):
+            raise TypeError(
+                f"value for {item} must be a boolean. Found `{config[item]}`"
+            )
+
+    user_set_grouping = False
+    group_by = SnapshotGroupByOptions(False, False, False)
+    try:
+        group_by.host = config["host"]
+        user_set_grouping = True
+    except KeyError:
+        group_by.host = False
+    try:
+        group_by.path = config["path"]
+        user_set_grouping = True
+    except KeyError:
+        group_by.path = False
+    try:
+        group_by.tag = config["tag"]
+        user_set_grouping = True
+    except KeyError:
+        group_by.tag = False
+
+    # if user did not set any options, return default config
+    if not user_set_grouping:
+        return SnapshotGroupByOptions()
+
+    # return group_by only if grouping is enabled
+    if group_by.enabled:
+        return group_by
+    else:
+        return None
+
+
 def get_repository(name: str, config: dict, restic_cli: ResticCli) -> Repository:
     """
     Return a Repository instance populated with the information from config

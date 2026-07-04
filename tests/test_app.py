@@ -263,6 +263,46 @@ class TestGetPolicy:
         assert app.get_policy({"keep-last": 1}) == Policy(1, no_current=False)
 
 
+class TestGetGroupBy:
+    """Tests for the function app.get_group_by"""
+
+    def test_no_grouping(self):
+        """an empty dictionary (i.e. the user set no options) should return the default of host/path"""
+        assert app.get_group_by({}) == SnapshotGroupByOptions()
+
+    def test_disabled_grouping(self):
+        """If user disables grouping, None should be returned"""
+        assert app.get_group_by({"host": False, "path": False, "tag": False}) is None
+
+    @pytest.mark.parametrize(
+        "options, expectation",
+        [
+            ({"host": True}, SnapshotGroupByOptions(True, False, False)),
+            ({"path": True}, SnapshotGroupByOptions(False, True, False)),
+            ({"tag": True}, SnapshotGroupByOptions(False, False, True)),
+        ],
+    )
+    def test_enabled_grouping(self, options, expectation):
+        """valid grouping options should be able to be set"""
+        assert app.get_group_by(options) == expectation
+
+    @pytest.mark.parametrize(
+        "options",
+        [
+            ({"host": "true"}),
+            ({"path": 9}),
+            ({"tag": 3.2}),
+            ({"host": None}),
+            ({"host": 0}),
+            ({"host": []}),
+        ],
+    )
+    def test_non_bool_input(self, options):
+        """an input that is not a bool, should cause an exception"""
+        with pytest.raises(TypeError):
+            app.get_group_by(options)
+
+
 class TestGetRepository:
     """Tests for the function app.get_repository"""
 
