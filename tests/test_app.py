@@ -303,6 +303,52 @@ class TestGetGroupBy:
             app.get_group_by(options)
 
 
+class TestValidateFilterInput:
+    """Tests for the function app.validate_filter_input"""
+
+    def test_not_a_list(self):
+        """should raise a TypeError if input is not a list"""
+        with pytest.raises(TypeError):
+            app.validate_filter_input("foo")
+
+    def test_list_of_not_strings(self):
+        """should raise a TypeError if list contains not-a-string"""
+        with pytest.raises(TypeError):
+            app.validate_filter_input(["foo", 2])
+
+    def test_list_of_strings(self):
+        """should not raise an error if input is a list of strings"""
+        app.validate_filter_input(["foo", "bar"])
+
+
+class TestGetSnapFilter:
+    """Tests for the function app.get_snap_filter"""
+
+    def test_no_filters(self):
+        """no filters should return None"""
+        assert app.get_snap_filter({}) is None
+
+    @pytest.mark.parametrize(
+        "filters, expectation",
+        [
+            ({"host": ["server.local"]}, SnapshotFilterOptions(host=["server.local"])),
+            (
+                {"host": ["server1.local", "server2.local"]},
+                SnapshotFilterOptions(host=["server1.local", "server2.local"]),
+            ),
+            ({"tag": ["able, baker"]}, SnapshotFilterOptions(tag=["able, baker"])),
+            (
+                {"tag": ["able, baker", "charlie"]},
+                SnapshotFilterOptions(tag=["able, baker", "charlie"]),
+            ),
+            ({"path": ["/tmp"]}, SnapshotFilterOptions(path=["/tmp"])),
+            ({"path": ["/tmp", "/var"]}, SnapshotFilterOptions(path=["/tmp", "/var"])),
+        ],
+    )
+    def test_enabled_filters(self, filters, expectation):
+        assert app.get_snap_filter(filters) == expectation
+
+
 class TestGetRepository:
     """Tests for the function app.get_repository"""
 

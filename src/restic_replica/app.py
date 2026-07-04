@@ -246,6 +246,53 @@ def get_group_by(config: dict) -> Optional[SnapshotGroupByOptions]:
         return None
 
 
+def validate_filter_input(input: list[str]):
+    """
+    validate input is a list of strings
+
+    Args:
+        input: the list to validate
+
+    Raises:
+        TypeError: raised if input is not a list of strings
+    """
+    if not isinstance(input, list):
+        raise TypeError(f"Expected a list, but received: {repr(input)}")
+
+    for item in input:
+        if not isinstance(item, str):
+            raise TypeError(
+                f"Expected all elements to be strings, but found: {repr(item)}"
+            )
+
+
+def get_snap_filter(config: dict) -> Optional[SnapshotFilterOptions]:
+    """
+    Return a SnapshotFilterOptions instance populated with the information from config
+
+    Args:
+        config: group-by configuration dictionary
+
+    Returns:
+        a populated SnapshotFilterOptions instance
+
+    Raises:
+        TypeError: raised if invalid data is read from the config.
+    """
+    host = config.get("host", [])
+    tag = config.get("tag", [])
+    path = config.get("path", [])
+
+    if not any((host, tag, path)):
+        return None
+
+    validate_filter_input(host)
+    validate_filter_input(tag)
+    validate_filter_input(path)
+
+    return SnapshotFilterOptions(host, path, tag)
+
+
 def get_repository(name: str, config: dict, restic_cli: ResticCli) -> Repository:
     """
     Return a Repository instance populated with the information from config
