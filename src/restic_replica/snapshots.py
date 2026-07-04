@@ -1,6 +1,6 @@
 import json
 from collections import namedtuple
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from itertools import compress
 from typing import Optional, Union
@@ -80,9 +80,9 @@ class SnapshotGroupByOptions:
 class SnapshotFilterOptions:
     """restic-level filtering options for snapshot listings"""
 
-    host: Optional[str] = None
-    path: Optional[str] = None
-    tag: Optional[list[str]] = None
+    host: list[Optional[str]] = field(default_factory=list)
+    path: list[Optional[str]] = field(default_factory=list)
+    tag: list[Optional[str]] = field(default_factory=list)
 
 
 @dataclass

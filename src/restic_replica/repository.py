@@ -298,11 +298,11 @@ class Repository:
             args.extend([f"--group-by={str(group_by)}"])
         if snap_filter:
             if snap_filter.host:
-                args.extend([f"--host={snap_filter.host}"])
+                args.extend([f"--host={h}" for h in snap_filter.host])
             if snap_filter.path:
-                args.extend([f"--path={snap_filter.path}"])
+                args.extend([f"--path={p}" for p in snap_filter.path])
             if snap_filter.tag:
-                args.extend([f"--tag={','.join(snap_filter.tag)}"])
+                args.extend([f"--tag={t}" for t in snap_filter.tag])
         return self.restic_cli.execute(
             args,
             environment_vars=self.environment_vars,

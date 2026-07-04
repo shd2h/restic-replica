@@ -409,12 +409,24 @@ class TestRepository:
             "filter, expectation",
             [
                 (None, []),
-                (SnapshotFilterOptions(host="system"), ["--host=system"]),
-                (SnapshotFilterOptions(path="/home"), ["--path=/home"]),
-                (SnapshotFilterOptions(tag=["foo", "bar"]), ["--tag=foo,bar"]),
+                (SnapshotFilterOptions(host=["system1"]), ["--host=system1"]),
+                (
+                    SnapshotFilterOptions(host=["system1", "system2"]),
+                    ["--host=system1", "--host=system2"],
+                ),
+                (SnapshotFilterOptions(path=["/home"]), ["--path=/home"]),
+                (
+                    SnapshotFilterOptions(path=["/home", "/usr"]),
+                    ["--path=/home", "--path=/usr"],
+                ),
+                (SnapshotFilterOptions(tag=["foo,bar"]), ["--tag=foo,bar"]),
+                (
+                    SnapshotFilterOptions(tag=["foo,bar", "bam"]),
+                    ["--tag=foo,bar", "--tag=bam"],
+                ),
                 (
                     SnapshotFilterOptions(
-                        host="system", path="/home", tag=["foo", "bar"]
+                        host=["system"], path=["/home"], tag=["foo,bar"]
                     ),
                     ["--host=system", "--path=/home", "--tag=foo,bar"],
                 ),
