@@ -267,8 +267,8 @@ class TestGetGroupBy:
     """Tests for the function app.get_group_by"""
 
     def test_no_grouping(self):
-        """an empty dictionary (i.e. the user set no options) should return the default of host/path"""
-        assert app.get_group_by({}) == SnapshotGroupByOptions()
+        """an empty dictionary should return the default of host/path grouping"""
+        assert app.get_group_by({}) == SnapshotGroupByOptions(True, True, False)
 
     def test_disabled_grouping(self):
         """If user disables grouping, None should be returned"""
@@ -277,9 +277,12 @@ class TestGetGroupBy:
     @pytest.mark.parametrize(
         "options, expectation",
         [
-            ({"host": True}, SnapshotGroupByOptions(True, False, False)),
-            ({"path": True}, SnapshotGroupByOptions(False, True, False)),
-            ({"tag": True}, SnapshotGroupByOptions(False, False, True)),
+            ({"host": True}, SnapshotGroupByOptions(True, True, False)),
+            ({"host": False}, SnapshotGroupByOptions(False, True, False)),
+            ({"path": True}, SnapshotGroupByOptions(True, True, False)),
+            ({"path": False}, SnapshotGroupByOptions(True, False, False)),
+            ({"tag": True}, SnapshotGroupByOptions(True, True, True)),
+            ({"tag": False}, SnapshotGroupByOptions(True, True, False)),
         ],
     )
     def test_enabled_grouping(self, options, expectation):

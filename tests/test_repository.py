@@ -383,6 +383,7 @@ class TestRepository:
         def test_group_by(self, repository_fixture):
             """group_by should not be set by default"""
             test_group = SnapshotGroupByOptions()
+            empty_group = SnapshotGroupByOptions(False, False, False)
             with mock.patch.object(
                 repository_fixture.restic_cli,
                 "execute",
@@ -401,6 +402,13 @@ class TestRepository:
                         f"{repository_fixture.uri}",
                         "snapshots",
                         "--group-by=host,path",
+                    ],
+                )
+                assert repository_fixture.snapshots(group_by=empty_group) == (
+                    [
+                        "-r",
+                        f"{repository_fixture.uri}",
+                        "snapshots",
                     ],
                 )
 

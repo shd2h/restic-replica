@@ -294,7 +294,7 @@ class Repository:
         # execute restic CLI with the snapshots argument
         args = self._common_args()
         args.extend(["snapshots"])
-        if group_by:
+        if group_by and group_by.enabled:
             args.extend([f"--group-by={str(group_by)}"])
         if snap_filter:
             if snap_filter.host:

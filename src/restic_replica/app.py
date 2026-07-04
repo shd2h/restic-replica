@@ -217,33 +217,17 @@ def get_group_by(config: dict) -> Optional[SnapshotGroupByOptions]:
                 f"value for {item} must be a boolean. Found `{config[item]}`"
             )
 
-    user_set_grouping = False
-    group_by = SnapshotGroupByOptions(False, False, False)
-    try:
-        group_by.host = config["host"]
-        user_set_grouping = True
-    except KeyError:
-        group_by.host = False
-    try:
-        group_by.path = config["path"]
-        user_set_grouping = True
-    except KeyError:
-        group_by.path = False
-    try:
-        group_by.tag = config["tag"]
-        user_set_grouping = True
-    except KeyError:
-        group_by.tag = False
+    # default to host, path grouping unless otherwise set.
+    host = config.get("host", True)
+    path = config.get("path", True)
+    tag = config.get("tag", False)
 
-    # if user did not set any options, return default config
-    if not user_set_grouping:
-        return SnapshotGroupByOptions()
-
-    # return group_by only if grouping is enabled
+    group_by = SnapshotGroupByOptions(host, path, tag)
     if group_by.enabled:
         return group_by
-    else:
-        return None
+
+    # if user disabled grouping, return None
+    return None
 
 
 def validate_filter_input(input: list[str]):
