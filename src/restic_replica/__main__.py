@@ -13,11 +13,11 @@ def main(argv=sys.argv[1:]):
         # get restic cli
         restic_cli = app.get_restic(config["restic"], verbose=args.verbose)
         # read policy info from file
-        policy = app.get_policy(config["policy"])
+        policy = app.get_policy(config.get("policy", {}))
         # read grouping info from file
-        group_by = app.get_group_by(config["grouping"])
+        group_by = app.get_group_by(config.get("grouping", {}))
         # read filters info from file
-        snap_filter = app.get_snap_filter(config["filters"])
+        snap_filter = app.get_snap_filter(config.get("filters", {}))
         # instance source and target repositories
         source = app.get_repository("source", config["source"], restic_cli)
         destination = app.get_repository("target", config["destination"], restic_cli)
