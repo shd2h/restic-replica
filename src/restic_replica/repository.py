@@ -316,6 +316,7 @@ class Repository:
         live_output: bool = False,
         json: bool = False,
         snapshots: Optional[SnapshotList] = None,
+        snap_filter: Optional[SnapshotFilterOptions] = None,
     ) -> subprocess.CompletedProcess:
         """
         Copy snapshots from other repository to this repository.
@@ -364,6 +365,15 @@ class Repository:
             for snapshot_group in snapshots.snapshot_groups:
                 for snapshot in snapshot_group.snapshots:
                     args.append(snapshot.id)
+        # if there were no snapshots, apply any filters
+        else:
+            if snap_filter:
+                if snap_filter.host:
+                    args.extend([f"--host={h}" for h in snap_filter.host])
+                if snap_filter.path:
+                    args.extend([f"--path={p}" for p in snap_filter.path])
+                if snap_filter.tag:
+                    args.extend([f"--tag={t}" for t in snap_filter.tag])
 
         return self.restic_cli.execute(
             args,

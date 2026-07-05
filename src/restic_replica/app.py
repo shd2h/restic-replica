@@ -435,7 +435,7 @@ def copy_snapshots(
         if len(snapshots.snapshot_groups) == 0:
             if snap_filter:
                 raise RuntimeError(
-                    f"No snapshots in restic repository `{source_repository}` matching the applied filter(s)."
+                    f"No snapshots in restic repository `{source_repository}` matching the set filter(s)."
                 )
             else:
                 raise RuntimeError(
@@ -455,21 +455,34 @@ def copy_snapshots(
             logger.info(f"The following snapshots will be copied: {f_snapshots}")
         else:
             f_snapshots = None
-            logger.info(
-                "No policy specified, all snapshots will be copied from the source repository"
-            )
+            if snap_filter:
+                logger.info(
+                    "No policy specified, all snapshots matching the set filter(s) will be copied from the source repository"
+                )
+            else:
+                logger.info(
+                    "No policy specified, all snapshots will be copied from the source repository"
+                )
 
         if dry_run:
             logger.info("dry-run flag set, exiting without performing copy operation")
             raise SystemExit(0)
-        else:
-            logger.info(
-                f"Starting copy of snapshots from {source_repository} to {destination_repository}"
-            )
+
+        logger.info(
+            f"Starting copy of snapshots from {source_repository} to {destination_repository}"
+        )
+        if f_snapshots:
             return destination_repository.copy(
                 source_repository,
                 live_output=True,
                 snapshots=f_snapshots,
+            )
+        # only pass filters if not passing SnapshotList
+        else:
+            return destination_repository.copy(
+                source_repository,
+                live_output=True,
+                snap_filter=snap_filter,
             )
     except (CalledProcessError, OSError) as err:
         if isinstance(err, CalledProcessError):

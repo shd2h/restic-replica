@@ -650,7 +650,11 @@ class TestCopySnapshots:
     def test_no_snapshot_list(
         self, snapshot_list_fixture, repository_fixture, restic_cli_fixture, monkeypatch
     ):
-        """A SnapshotList object should not be passed if a policy is not provided"""
+        """
+        if a policy is not provided;
+        - a SnapshotList object should not be passed
+        - a SnapshotFilterOptions object should be passed, if one is provided
+        """
         monkeypatch.setattr(
             "restic_replica.app.get_snapshots",
             lambda *args, **kwargs: snapshot_list_fixture,
@@ -664,8 +668,10 @@ class TestCopySnapshots:
                     password="secret2",
                 ),
                 repository_fixture,
+                snap_filter=SnapshotFilterOptions(),
             )
-            assert result["snapshots"] is None
+            assert "snapshots" not in result
+            assert isinstance(result["snap_filter"], SnapshotFilterOptions)
 
     @pytest.mark.usefixtures(
         "snapshot_list_fixture", "repository_fixture", "restic_cli_fixture"
@@ -710,6 +716,19 @@ class TestCopySnapshots:
                     password="secret2",
                 ),
                 repository_fixture,
+                dry_run=True,
+            )
+        # with snap_filter set
+        with pytest.raises(RuntimeError):
+            app.copy_snapshots(
+                Repository(
+                    "/tmp/restic-repo2",
+                    "myrepo2",
+                    restic_cli_fixture,
+                    password="secret2",
+                ),
+                repository_fixture,
+                snap_filter=SnapshotFilterOptions(),
                 dry_run=True,
             )
 

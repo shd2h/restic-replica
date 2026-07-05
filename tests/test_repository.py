@@ -674,3 +674,56 @@ class TestRepository:
                     ["-r", "/tmp/restic-repo", "copy", "--from-repo", "/tmp/repo2"]
                     + expected_ids,
                 )
+
+        @pytest.mark.usefixtures(
+            "repository_fixture",
+            "other_repository_fixture",
+        )
+        @pytest.mark.parametrize(
+            "filter, expectation",
+            [
+                (None, []),
+                (SnapshotFilterOptions(), []),
+                (SnapshotFilterOptions(host=["system1"]), ["--host=system1"]),
+                (
+                    SnapshotFilterOptions(host=["system1", "system2"]),
+                    ["--host=system1", "--host=system2"],
+                ),
+                (SnapshotFilterOptions(path=["/home"]), ["--path=/home"]),
+                (
+                    SnapshotFilterOptions(path=["/home", "/usr"]),
+                    ["--path=/home", "--path=/usr"],
+                ),
+                (SnapshotFilterOptions(tag=["foo,bar"]), ["--tag=foo,bar"]),
+                (
+                    SnapshotFilterOptions(tag=["foo,bar", "bam"]),
+                    ["--tag=foo,bar", "--tag=bam"],
+                ),
+                (
+                    SnapshotFilterOptions(
+                        host=["system"], path=["/home"], tag=["foo,bar"]
+                    ),
+                    ["--host=system", "--path=/home", "--tag=foo,bar"],
+                ),
+            ],
+        )
+        def test_copy_filteroptions(
+            self,
+            filter,
+            expectation,
+            repository_fixture,
+            other_repository_fixture,
+        ):
+            """supplying a snap_filter should result in the filter options being appended to args"""
+            with mock.patch.object(
+                repository_fixture.restic_cli,
+                "execute",
+                self.return_args,
+            ):
+                assert repository_fixture.copy(
+                    other_repository_fixture,
+                    snap_filter=filter,
+                ) == (
+                    ["-r", "/tmp/restic-repo", "copy", "--from-repo", "/tmp/repo2"]
+                    + expectation,
+                )
