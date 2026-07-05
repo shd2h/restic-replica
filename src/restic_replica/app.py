@@ -434,7 +434,6 @@ def copy_snapshots(
                 raise RuntimeError(
                     f"no snapshots left to copy after applying policy: `{policy}`"
                 )
-            # TODO: SnapshotList doesn't have a __str__ method yet.
             logger.info(f"The following snapshots will be copied: {snapshots}")
         else:
             f_snapshots = None

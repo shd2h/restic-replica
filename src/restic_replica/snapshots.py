@@ -392,6 +392,9 @@ class SnapshotList:
 
     snapshot_groups: list[SnapshotGroup]
 
+    def __str__(self):
+        return ", ".join([str(group) for group in self.snapshot_groups])
+
     @staticmethod
     def is_grouped(snapshot_list):
         """
