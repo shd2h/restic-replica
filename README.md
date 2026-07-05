@@ -6,7 +6,7 @@ A command line tool to copy snapshots between Restic repositories, written in py
 What is Restic? An awesome [backup tool](https://restic.readthedocs.io/).  
 Why? 
 * Restic does not natively support configuration files.  
-* Restic does not have a way to filter which snapshots should be copied.  
+* Restic's copy operation does not allow filtering the snapshots to be copied by age, or number of snapshots.
 
 ## Installation
 
@@ -32,14 +32,18 @@ An example configuration file has been created at /home/user/.restic-replica/con
 
 ## Policy
 
-`restic-replica` supports defining a policy within the configuration file, to filter which snapshots will be copied between the source and destination repositories.  
-The filters defined in the policy work the same as the filters used with `restic forget`, in that all of the calendar-based filters (e.g. keep-daily, keep-weekly, etc.) work on natural time boundaries, and are not relative to when `restic-replica` is run.   
-Weeks span from Monday 00:00 to Sunday 23:59, days from 00:00 to 23:59, etc. The _most recent_ snapshot within a calendar period is always selected.  
+A policy can be defined within the configuration file to apply age or number-based filtering, controlling which snapshots will be copied between the source and destination repositories.
+
+The policy is applied to individual snapshot groups (e.g. "keep-last = 2" will copy the last 2 snapshots from each group). Snapshots are grouped by host and path by default, but this can be customised or disabled.
+
+The filters defined in the policy work the same as the filters used with `restic forget`, in that all of the calendar-based filters (e.g. keep-daily, keep-weekly, etc.) work on natural time boundaries, and are not relative to when `restic-replica` is run.
+
+Weeks span from Monday 00:00 to Sunday 23:59, days from 00:00 to 23:59, etc. The _most recent_ snapshot within a calendar period is always selected.
 For example; if multiple snapshots exist on a given day, and a keep-daily filter selects a snapshot from that day, the most recent snapshot taken on that day is selected.  
 
 Use of the `--dry-run` option is recommended to verify that the specified filter options match expectations.  
 
-__Note:__ If no policy is set, i.e. all filter options (e.g, keep-last, keep-daily, etc.) in the configuration file are commented out, all snapshots present in the source repository will be copied to the destination repository.
+__Note:__ Commenting out the filter options (e.g, keep-last, keep-daily, etc.) in the configuration file will disable the policy. In this state, all snapshots will be copied, unless they are excluded by host, path, or tag [filters](#filters).
 
 ### The "exclude-current-period" option
 
@@ -76,6 +80,31 @@ However, the exclusion period is applied individually to each enabled filter.
 For example:
 * If both keep-monthly and keep-daily filters are enabled, the keep-monthly filter will ignore any snapshots from the current month.
 * The keep-daily filter will only ignore snapshots taken today. It will still consider including snapshots taken on the other days in the current month for copying.  
+
+
+## Grouping
+
+When determining which snapshots to copy, the configured policy will be applied to each snapshot group individually.
+Snapshots can be grouped by host, path, and/or tag; by default they are grouped by host and path.
+All three of these grouping options may be set independently of one another, i.e. all combinations are supported.
+If all grouping options are disabled, the policy will be applied to all snapshots in the repository.
+
+Snapshot grouping is performed by restic; see the `group-by` option in `restic snapshots --help`.
+
+__Note:__ grouping has no effect if a policy is not configured.
+
+
+## Filters
+
+Additional restrictions on the snapshots that will be considered for copying can be set by applying filters on hostname, path, and/or tags.
+- Hostname filtering; snapshots match if they are for any of the specified hosts.
+- Path filtering; snapshots must contain all of the (absolute) paths specified. If any path is missing, the snapshot is excluded.
+- Tag filtering; tags can be provided individually, or in a comma separated group, or a combination thereof.
+    - Individual tags: snapshots match if they contain any one of the individual tags
+    - Tag Groups: snapshots match if they contain all of the tags in the group
+    - e.g. ["tag_1, tag_2"] will only match snapshots with both tags. ["tag_1", "tag_2"] will match snapshots with either, or both tags.
+
+Host, path, and tag filtering is performed by restic; see the `--host`, `--path`, and `--tag` options in `restic snapshots --help`.
 
 
 ## Development
