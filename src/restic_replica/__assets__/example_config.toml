@@ -35,7 +35,9 @@
 [filters]
 ## Non-time based snapshot filtering options used by the copy command.
 ## Disabled by default.
+## Note: snapshots for *any* of the specified hostnames will be selected
 # host = ['hostname.local']
+## Note: snapshots including *any* of the specified tag groups will be selected
 # tag = ['tag_alpha,tag_beta', 'tag_gamma']
 ## Note: only snapshots that include **all specified paths** will be selected
 # path = ['/path/to/files']

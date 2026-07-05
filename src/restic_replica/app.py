@@ -224,9 +224,11 @@ def get_group_by(config: dict) -> Optional[SnapshotGroupByOptions]:
 
     group_by = SnapshotGroupByOptions(host, path, tag)
     if group_by.enabled:
+        logger.info(f"Grouping snapshots by: {group_by}")
         return group_by
 
     # if user disabled grouping, return None
+    logger.info("Snapshot grouping disabled")
     return None
 
 
@@ -274,6 +276,18 @@ def get_snap_filter(config: dict) -> Optional[SnapshotFilterOptions]:
     validate_filter_input(tag)
     validate_filter_input(path)
 
+    if host:
+        logger.info(
+            f"Only snapshots for the following host(s) will be considered: {host}"
+        )
+    if path:
+        logger.info(
+            f"Only snapshots that include *all* of the following (absolute) path(s) will be considered: {path}"
+        )
+    if tag:
+        logger.info(
+            f"Only snapshots including at least one of the following tag group(s) will be considered: {tag}"
+        )
     return SnapshotFilterOptions(host, path, tag)
 
 
@@ -419,10 +433,14 @@ def copy_snapshots(
         # retrieve the list of snaps from the source
         snapshots = get_snapshots(source_repository, group_by, snap_filter)
         if len(snapshots.snapshot_groups) == 0:
-            # TODO: we can also get 0 if user applied host/path/tag filtering, so this error is misleading
-            raise RuntimeError(
-                f"no snapshots in restic repository: `{source_repository}`"
-            )
+            if snap_filter:
+                raise RuntimeError(
+                    f"No snapshots in restic repository `{source_repository}` matching the applied filter(s)."
+                )
+            else:
+                raise RuntimeError(
+                    f"no snapshots in restic repository: `{source_repository}`"
+                )
 
         # if the user specified a filtering policy at the application level, apply it
         if policy:
