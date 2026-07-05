@@ -434,7 +434,7 @@ def copy_snapshots(
                 raise RuntimeError(
                     f"no snapshots left to copy after applying policy: `{policy}`"
                 )
-            logger.info(f"The following snapshots will be copied: {snapshots}")
+            logger.info(f"The following snapshots will be copied: {f_snapshots}")
         else:
             f_snapshots = None
             logger.info(
