@@ -26,6 +26,7 @@ Source = "https://github.com/shd2h/restic-replica"
 
 [dependency-groups]
 dev = [
+    "nox>=2026.4.10",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "pytest-subprocess>=1.6.0",
