@@ -26,11 +26,10 @@ Source = "https://github.com/shd2h/restic-replica"
 
 [dependency-groups]
 dev = [
-    "black>=25.1.0",
-    "pytest>=8.3.5",
-    "pytest-cov>=6.1.1",
-    "pytest-subprocess>=1.5.3",
-    "ruff>=0.11.5",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "pytest-subprocess>=1.6.0",
+    "ruff>=0.15.20",
 ]
 
 [project.scripts]
