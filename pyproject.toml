@@ -14,6 +14,8 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: System :: Archiving :: Mirroring",
     "Operating System :: OS Independent"
 ]
@@ -26,11 +28,11 @@ Source = "https://github.com/shd2h/restic-replica"
 
 [dependency-groups]
 dev = [
-    "black>=25.1.0",
-    "pytest>=8.3.5",
-    "pytest-cov>=6.1.1",
-    "pytest-subprocess>=1.5.3",
-    "ruff>=0.11.5",
+    "nox>=2026.4.10",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "pytest-subprocess>=1.6.0",
+    "ruff>=0.15.20",
 ]
 
 [project.scripts]
