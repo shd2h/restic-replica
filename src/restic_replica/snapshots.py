@@ -1,7 +1,8 @@
-from collections import namedtuple
-from datetime import datetime
-from dataclasses import dataclass
 import json
+from collections import namedtuple
+from dataclasses import dataclass, field
+from datetime import datetime
+from itertools import compress
 from typing import Optional, Union
 
 
@@ -54,6 +55,50 @@ class Policy:
 
 
 @dataclass
+class SnapshotGroupByOptions:
+    """a group-by definition for a list of snapshots"""
+
+    host: bool = True
+    path: bool = True
+    tag: bool = False
+
+    @property
+    def enabled(self):
+        return self.host or self.path or self.tag
+
+    def __str__(self):
+        if self.host or self.path or self.tag:
+            all_options = ["host", "path", "tag"]
+            selectors = [self.host, self.path, self.tag]
+            enabled_options = list(compress(all_options, selectors))
+            return f"{','.join(enabled_options)}"
+        else:
+            return ""
+
+
+@dataclass
+class SnapshotFilterOptions:
+    """restic-level filtering options for snapshot listings"""
+
+    host: list[Optional[str]] = field(default_factory=list)
+    path: list[Optional[str]] = field(default_factory=list)
+    tag: list[Optional[str]] = field(default_factory=list)
+
+
+@dataclass
+class GroupKey:
+    """a restic group_key for a group of snapshots"""
+
+    hostname: Optional[str] = None
+    paths: Optional[list[str]] = None
+    tags: Optional[list[str]] = None
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(**data)
+
+
+@dataclass
 class Snapshot:
     """a restic snapshot"""
 
@@ -84,19 +129,25 @@ class Snapshot:
 
 
 @dataclass
-class SnapshotList:
-    """a list of restic snapshots"""
+class SnapshotGroup:
+    """a collection of restic snapshots"""
 
     snapshots: list[Snapshot]
+    group_key: Optional[GroupKey] = None
 
     def __str__(self):
         return ", ".join([snap.short_id for snap in self.snapshots])
 
     @classmethod
-    def from_json(cls, data):
-        snap_list = []
-        for snap in json.loads(data):
-            snap_list.append(Snapshot.from_dict(snap))
+    def from_grouped(cls, data):
+        """instance a snapshot group using data from a grouped restic snapshots listing"""
+        snap_list = [Snapshot.from_dict(snap) for snap in data["snapshots"]]
+        return cls(snap_list, GroupKey.from_dict(data["group_key"]))
+
+    @classmethod
+    def from_ungrouped(cls, data):
+        """instance a snapshot group using data from an ungrouped restic snapshots listing"""
+        snap_list = [Snapshot.from_dict(snap) for snap in data]
         return cls(snap_list)
 
     def time_sorted(self, descending=False):
@@ -331,3 +382,52 @@ class SnapshotList:
                     ):
                         filtered_snapshots.append(snap)
         return filtered_snapshots
+
+
+@dataclass
+class SnapshotList:
+    """
+    A list of restic snapshots, comprised of one or more snapshot groupings
+    """
+
+    snapshot_groups: list[SnapshotGroup]
+
+    def __str__(self):
+        return ", ".join([str(group) for group in self.snapshot_groups])
+
+    @staticmethod
+    def is_grouped(snapshot_list):
+        """
+        returns True if the restic snapshot list is grouped, False if not, or if the snapshot list is empty.
+
+        Args:
+            snapshot_list: output from `restic snapshots --json`, converted from json to native python data objects
+
+        Returns:
+            grouped: True if restic snapshot data is grouped
+        """
+        # the presence of group_key indicates grouping, i.e. this is a list of snapshot lists, with embedded group info.
+        # otherwise, we're looking at the fields of a regular snapshot itself, and this is just a list of snapshots.
+        if "group_key" in snapshot_list[0].keys():
+            return True
+
+        return False
+
+    @classmethod
+    def from_json(cls, data):
+        """instance a snapshot list from a `restic snapshots --json` output"""
+        restic_data = json.loads(data)
+
+        # handle case where repository has no snapshots gracefully
+        if len(restic_data) == 0:
+            return cls([])
+
+        # handle grouped case
+        if cls.is_grouped(restic_data):
+            snap_list = []
+            for snap_group in restic_data:
+                snap_list.append(SnapshotGroup.from_grouped(snap_group))
+            return cls(snap_list)
+
+        # handle ungrouped case
+        return cls([SnapshotGroup.from_ungrouped(restic_data)])

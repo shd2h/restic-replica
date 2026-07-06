@@ -3,5 +3,6 @@ pytest_plugins = [
     "tests.fixtures.repository_fixture",
     "tests.fixtures.restic_cli_fixture",
     "tests.fixtures.snapshot_fixture",
+    "tests.fixtures.snapshot_group_fixture",
     "tests.fixtures.snapshot_list_fixture",
 ]

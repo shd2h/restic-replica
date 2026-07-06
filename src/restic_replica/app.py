@@ -1,15 +1,21 @@
 import importlib.resources
 import logging
-from pathlib import Path
 import platform
 import shutil
-from subprocess import CalledProcessError, CompletedProcess
 import tomllib
+from pathlib import Path
+from subprocess import CalledProcessError, CompletedProcess
 from typing import Optional
 
 from restic_replica import __assets__
 from restic_replica.repository import Repository, ResticCli
-from restic_replica.snapshots import Policy, SnapshotList
+from restic_replica.snapshots import (
+    Policy,
+    SnapshotFilterOptions,
+    SnapshotGroupByOptions,
+    SnapshotGroup,
+    SnapshotList,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -192,6 +198,99 @@ def get_policy(config: dict) -> Optional[Policy]:
         return None
 
 
+def get_group_by(config: dict) -> Optional[SnapshotGroupByOptions]:
+    """
+    Return a SnapshotGroupByOptions instance populated with the information from config
+
+    Args:
+        config: group-by configuration dictionary
+
+    Returns:
+        a populated SnapshotGroupByOptions instance
+
+    Raises:
+        TypeError: raised if invalid group-by options are set in the config.
+    """
+    for item in config:
+        if not isinstance(config[item], bool):
+            raise TypeError(
+                f"value for {item} must be a boolean. Found `{config[item]}`"
+            )
+
+    # default to host, path grouping unless otherwise set.
+    host = config.get("host", True)
+    path = config.get("path", True)
+    tag = config.get("tag", False)
+
+    group_by = SnapshotGroupByOptions(host, path, tag)
+    if group_by.enabled:
+        logger.info(f"Grouping snapshots by: {group_by}")
+        return group_by
+
+    # if user disabled grouping, return None
+    logger.info("Snapshot grouping disabled")
+    return None
+
+
+def validate_filter_input(input: list[str]):
+    """
+    validate input is a list of strings
+
+    Args:
+        input: the list to validate
+
+    Raises:
+        TypeError: raised if input is not a list of strings
+    """
+    if not isinstance(input, list):
+        raise TypeError(f"Expected a list, but received: {repr(input)}")
+
+    for item in input:
+        if not isinstance(item, str):
+            raise TypeError(
+                f"Expected all elements to be strings, but found: {repr(item)}"
+            )
+
+
+def get_snap_filter(config: dict) -> Optional[SnapshotFilterOptions]:
+    """
+    Return a SnapshotFilterOptions instance populated with the information from config
+
+    Args:
+        config: group-by configuration dictionary
+
+    Returns:
+        a populated SnapshotFilterOptions instance
+
+    Raises:
+        TypeError: raised if invalid data is read from the config.
+    """
+    host = config.get("host", [])
+    tag = config.get("tag", [])
+    path = config.get("path", [])
+
+    if not any((host, tag, path)):
+        return None
+
+    validate_filter_input(host)
+    validate_filter_input(tag)
+    validate_filter_input(path)
+
+    if host:
+        logger.info(
+            f"Only snapshots for the following host(s) will be considered: {host}"
+        )
+    if path:
+        logger.info(
+            f"Only snapshots that include *all* of the following (absolute) path(s) will be considered: {path}"
+        )
+    if tag:
+        logger.info(
+            f"Only snapshots including at least one of the following tag group(s) will be considered: {tag}"
+        )
+    return SnapshotFilterOptions(host, path, tag)
+
+
 def get_repository(name: str, config: dict, restic_cli: ResticCli) -> Repository:
     """
     Return a Repository instance populated with the information from config
@@ -258,20 +357,58 @@ def check_repository_access(repository: Repository) -> bool:
         raise RuntimeError(f"Unable to access restic repository {repository}") from err
 
 
-def get_filtered_snapshots(repository: Repository, policy: Policy) -> SnapshotList:
-    """"""
-    snaps = SnapshotList.from_json(repository.snapshots(json=True).stdout)
-    filtered_snaps = SnapshotList(snaps.filter(policy))
-    if len(filtered_snaps.snapshots) > 0:
-        return filtered_snaps
-    else:
-        raise RuntimeError("snapshot filtering led to 0 snapshots to copy")
+def get_snapshots(
+    repository: Repository,
+    group_by: Optional[SnapshotGroupByOptions] = None,
+    snap_filter: Optional[SnapshotFilterOptions] = None,
+) -> SnapshotList:
+    """
+    Return a SnapshotList containing information about snapshots in a repository,
+    optionally grouped, and filtered by restic.
+
+    Args:
+        repository: the Repository instance to check access for
+        group_by: the grouping options to pass to restic
+        snap_filter: the filtering options to pass to restic
+
+    Returns:
+        a populated SnapshotList instance
+    """
+    return SnapshotList.from_json(
+        repository.snapshots(
+            json=True, group_by=group_by, snap_filter=snap_filter
+        ).stdout
+    )
+
+
+def apply_policy(
+    snapshots: SnapshotList,
+    policy: Policy,
+) -> SnapshotList:
+    """
+    Apply a policy to filter the snapshots in a SnapshotList instance.
+
+    Args:
+        repository: the Repository instance to check access for
+        policy: the Policy to be applied
+
+    Returns:
+        a filtered SnapshotList instance
+    """
+    filtered_snaps = []
+    for group in snapshots.snapshot_groups:
+        f_group = group.filter(policy)
+        if len(f_group) > 0:
+            filtered_snaps.append(SnapshotGroup(f_group))
+    return SnapshotList(snapshot_groups=filtered_snaps)
 
 
 def copy_snapshots(
     source_repository: Repository,
     destination_repository: Repository,
     policy: Optional[Policy] = None,
+    group_by: Optional[SnapshotGroupByOptions] = None,
+    snap_filter: Optional[SnapshotFilterOptions] = None,
     dry_run: bool = False,
 ) -> CompletedProcess:
     """
@@ -281,6 +418,8 @@ def copy_snapshots(
         source_repository: the Repository instance snapshots will be copied _from_
         destination_repository: the Repository instance snapshots will be copied _to_
         policy: an optional Policy instance that will be applied to filter the list of snapshots that will be copied
+        group_by: how the snapshots should be grouped before applying policy to each group (see `restic snapshots --group-by`)
+        snap_filter: optionally filter the snapshots that will be copied by host, path, and/or tags (see `restic snapshots --host, --path, and --tag`)
         dry_run: whether to actually perform the copy operation or not
 
     Returns:
@@ -291,28 +430,59 @@ def copy_snapshots(
         SystemExit: raised instead of performing the copy process, if dry_run is set
     """
     try:
+        # retrieve the list of snaps from the source
+        snapshots = get_snapshots(source_repository, group_by, snap_filter)
+        if len(snapshots.snapshot_groups) == 0:
+            if snap_filter:
+                raise RuntimeError(
+                    f"No snapshots in restic repository `{source_repository}` matching the set filter(s)."
+                )
+            else:
+                raise RuntimeError(
+                    f"no snapshots in restic repository: `{source_repository}`"
+                )
+
+        # if the user specified a filtering policy at the application level, apply it
         if policy:
             logger.info(
-                f"Filtering snapshots to be copied from source repository using policy: {policy}"
+                f"Filtering snapshot group(s) to be copied from source repository using policy: {policy}"
             )
-            filtered_snapshots = get_filtered_snapshots(source_repository, policy)
-            logger.info(f"The following snapshots will be copied: {filtered_snapshots}")
+            f_snapshots = apply_policy(snapshots, policy)
+            if len(f_snapshots.snapshot_groups) == 0:
+                raise RuntimeError(
+                    f"no snapshots left to copy after applying policy: `{policy}`"
+                )
+            logger.info(f"The following snapshots will be copied: {f_snapshots}")
         else:
-            logger.info(
-                "No policy specified, all snapshots will be copied from the source repository"
-            )
-            filtered_snapshots = None
+            f_snapshots = None
+            if snap_filter:
+                logger.info(
+                    "No policy specified, all snapshots matching the set filter(s) will be copied from the source repository"
+                )
+            else:
+                logger.info(
+                    "No policy specified, all snapshots will be copied from the source repository"
+                )
+
         if dry_run:
             logger.info("dry-run flag set, exiting without performing copy operation")
             raise SystemExit(0)
-        else:
-            logger.info(
-                f"Starting copy of snapshots from {source_repository.uri} to {destination_repository.uri}"
-            )
+
+        logger.info(
+            f"Starting copy of snapshots from {source_repository} to {destination_repository}"
+        )
+        if f_snapshots:
             return destination_repository.copy(
                 source_repository,
                 live_output=True,
-                snapshots=filtered_snapshots,
+                snapshots=f_snapshots,
+            )
+        # only pass filters if not passing SnapshotList
+        else:
+            return destination_repository.copy(
+                source_repository,
+                live_output=True,
+                snap_filter=snap_filter,
             )
     except (CalledProcessError, OSError) as err:
         if isinstance(err, CalledProcessError):

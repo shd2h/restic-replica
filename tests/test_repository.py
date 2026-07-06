@@ -1,11 +1,13 @@
-from contextlib import nullcontext as does_not_raise
 import logging
 import os
-import pytest
 import subprocess
+from contextlib import nullcontext as does_not_raise
 from unittest import mock
 
+import pytest
+
 from restic_replica import repository
+from restic_replica.snapshots import SnapshotFilterOptions, SnapshotGroupByOptions
 
 
 class TestResticCli:
@@ -377,6 +379,83 @@ class TestRepository:
                 assert repository_fixture.snapshots()["json"] is False
                 assert repository_fixture.snapshots(json=True)["json"] is True
 
+        @pytest.mark.usefixtures("repository_fixture")
+        def test_group_by(self, repository_fixture):
+            """group_by should not be set by default"""
+            test_group = SnapshotGroupByOptions()
+            empty_group = SnapshotGroupByOptions(False, False, False)
+            with mock.patch.object(
+                repository_fixture.restic_cli,
+                "execute",
+                self.return_args,
+            ):
+                assert repository_fixture.snapshots() == (
+                    [
+                        "-r",
+                        f"{repository_fixture.uri}",
+                        "snapshots",
+                    ],
+                )
+                assert repository_fixture.snapshots(group_by=test_group) == (
+                    [
+                        "-r",
+                        f"{repository_fixture.uri}",
+                        "snapshots",
+                        "--group-by=host,path",
+                    ],
+                )
+                assert repository_fixture.snapshots(group_by=empty_group) == (
+                    [
+                        "-r",
+                        f"{repository_fixture.uri}",
+                        "snapshots",
+                    ],
+                )
+
+        @pytest.mark.usefixtures("repository_fixture")
+        @pytest.mark.parametrize(
+            "filter, expectation",
+            [
+                (None, []),
+                (SnapshotFilterOptions(host=["system1"]), ["--host=system1"]),
+                (
+                    SnapshotFilterOptions(host=["system1", "system2"]),
+                    ["--host=system1", "--host=system2"],
+                ),
+                (SnapshotFilterOptions(path=["/home"]), ["--path=/home"]),
+                (
+                    SnapshotFilterOptions(path=["/home", "/usr"]),
+                    ["--path=/home", "--path=/usr"],
+                ),
+                (SnapshotFilterOptions(tag=["foo,bar"]), ["--tag=foo,bar"]),
+                (
+                    SnapshotFilterOptions(tag=["foo,bar", "bam"]),
+                    ["--tag=foo,bar", "--tag=bam"],
+                ),
+                (
+                    SnapshotFilterOptions(
+                        host=["system"], path=["/home"], tag=["foo,bar"]
+                    ),
+                    ["--host=system", "--path=/home", "--tag=foo,bar"],
+                ),
+            ],
+        )
+        def test_snap_filter(self, repository_fixture, filter, expectation):
+            """snap_filter should not be set by default"""
+            with mock.patch.object(
+                repository_fixture.restic_cli,
+                "execute",
+                self.return_args,
+            ):
+                assert repository_fixture.snapshots(snap_filter=filter) == (
+                    [
+                        "-r",
+                        f"{repository_fixture.uri}",
+                        "snapshots",
+                    ]
+                    + expectation,
+                )
+
     class TestCopy:
         """Tests for the copy method"""
 
@@ -577,7 +656,13 @@ class TestRepository:
         ):
             """supplying a snapshot list should result in all snapshot IDs being appended to args"""
 
-            expected_ids = [i.id for i in snapshot_list_fixture.snapshots]
+            # this doesn't check that it iterates though...
+            expected_ids = [
+                i.id for i in snapshot_list_fixture.snapshot_groups[0].snapshots
+            ]
+            expected_ids.extend(
+                [i.id for i in snapshot_list_fixture.snapshot_groups[1].snapshots]
+            )
             with mock.patch.object(
                 repository_fixture.restic_cli,
                 "execute",
@@ -588,4 +673,57 @@ class TestRepository:
                 ) == (
                     ["-r", "/tmp/restic-repo", "copy", "--from-repo", "/tmp/repo2"]
                     + expected_ids,
+                )
+
+        @pytest.mark.usefixtures(
+            "repository_fixture",
+            "other_repository_fixture",
+        )
+        @pytest.mark.parametrize(
+            "filter, expectation",
+            [
+                (None, []),
+                (SnapshotFilterOptions(), []),
+                (SnapshotFilterOptions(host=["system1"]), ["--host=system1"]),
+                (
+                    SnapshotFilterOptions(host=["system1", "system2"]),
+                    ["--host=system1", "--host=system2"],
+                ),
+                (SnapshotFilterOptions(path=["/home"]), ["--path=/home"]),
+                (
+                    SnapshotFilterOptions(path=["/home", "/usr"]),
+                    ["--path=/home", "--path=/usr"],
+                ),
+                (SnapshotFilterOptions(tag=["foo,bar"]), ["--tag=foo,bar"]),
+                (
+                    SnapshotFilterOptions(tag=["foo,bar", "bam"]),
+                    ["--tag=foo,bar", "--tag=bam"],
+                ),
+                (
+                    SnapshotFilterOptions(
+                        host=["system"], path=["/home"], tag=["foo,bar"]
+                    ),
+                    ["--host=system", "--path=/home", "--tag=foo,bar"],
+                ),
+            ],
+        )
+        def test_copy_filteroptions(
+            self,
+            filter,
+            expectation,
+            repository_fixture,
+            other_repository_fixture,
+        ):
+            """supplying a snap_filter should result in the filter options being appended to args"""
+            with mock.patch.object(
+                repository_fixture.restic_cli,
+                "execute",
+                self.return_args,
+            ):
+                assert repository_fixture.copy(
+                    other_repository_fixture,
+                    snap_filter=filter,
+                ) == (
+                    ["-r", "/tmp/restic-repo", "copy", "--from-repo", "/tmp/repo2"]
+                    + expectation,
                 )

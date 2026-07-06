@@ -8,7 +8,12 @@ from unittest import mock
 
 from restic_replica import __assets__, app
 from restic_replica.repository import Repository, ResticCli
-from restic_replica.snapshots import Policy
+from restic_replica.snapshots import (
+    Policy,
+    SnapshotList,
+    SnapshotFilterOptions,
+    SnapshotGroupByOptions,
+)
 
 
 class TestEnsureConfigFile:
@@ -258,6 +263,95 @@ class TestGetPolicy:
         assert app.get_policy({"keep-last": 1}) == Policy(1, no_current=False)
 
 
+class TestGetGroupBy:
+    """Tests for the function app.get_group_by"""
+
+    def test_no_grouping(self):
+        """an empty dictionary should return the default of host/path grouping"""
+        assert app.get_group_by({}) == SnapshotGroupByOptions(True, True, False)
+
+    def test_disabled_grouping(self):
+        """If user disables grouping, None should be returned"""
+        assert app.get_group_by({"host": False, "path": False, "tag": False}) is None
+
+    @pytest.mark.parametrize(
+        "options, expectation",
+        [
+            ({"host": True}, SnapshotGroupByOptions(True, True, False)),
+            ({"host": False}, SnapshotGroupByOptions(False, True, False)),
+            ({"path": True}, SnapshotGroupByOptions(True, True, False)),
+            ({"path": False}, SnapshotGroupByOptions(True, False, False)),
+            ({"tag": True}, SnapshotGroupByOptions(True, True, True)),
+            ({"tag": False}, SnapshotGroupByOptions(True, True, False)),
+        ],
+    )
+    def test_enabled_grouping(self, options, expectation):
+        """valid grouping options should be able to be set"""
+        assert app.get_group_by(options) == expectation
+
+    @pytest.mark.parametrize(
+        "options",
+        [
+            ({"host": "true"}),
+            ({"path": 9}),
+            ({"tag": 3.2}),
+            ({"host": None}),
+            ({"host": 0}),
+            ({"host": []}),
+        ],
+    )
+    def test_non_bool_input(self, options):
+        """an input that is not a bool, should cause an exception"""
+        with pytest.raises(TypeError):
+            app.get_group_by(options)
+
+
+class TestValidateFilterInput:
+    """Tests for the function app.validate_filter_input"""
+
+    def test_not_a_list(self):
+        """should raise a TypeError if input is not a list"""
+        with pytest.raises(TypeError):
+            app.validate_filter_input("foo")
+
+    def test_list_of_not_strings(self):
+        """should raise a TypeError if list contains not-a-string"""
+        with pytest.raises(TypeError):
+            app.validate_filter_input(["foo", 2])
+
+    def test_list_of_strings(self):
+        """should not raise an error if input is a list of strings"""
+        app.validate_filter_input(["foo", "bar"])
+
+
+class TestGetSnapFilter:
+    """Tests for the function app.get_snap_filter"""
+
+    def test_no_filters(self):
+        """no filters should return None"""
+        assert app.get_snap_filter({}) is None
+
+    @pytest.mark.parametrize(
+        "filters, expectation",
+        [
+            ({"host": ["server.local"]}, SnapshotFilterOptions(host=["server.local"])),
+            (
+                {"host": ["server1.local", "server2.local"]},
+                SnapshotFilterOptions(host=["server1.local", "server2.local"]),
+            ),
+            ({"tag": ["able, baker"]}, SnapshotFilterOptions(tag=["able, baker"])),
+            (
+                {"tag": ["able, baker", "charlie"]},
+                SnapshotFilterOptions(tag=["able, baker", "charlie"]),
+            ),
+            ({"path": ["/tmp"]}, SnapshotFilterOptions(path=["/tmp"])),
+            ({"path": ["/tmp", "/var"]}, SnapshotFilterOptions(path=["/tmp", "/var"])),
+        ],
+    )
+    def test_enabled_filters(self, filters, expectation):
+        assert app.get_snap_filter(filters) == expectation
+
+
 class TestGetRepository:
     """Tests for the function app.get_repository"""
 
@@ -359,49 +453,73 @@ class TestCheckRepositoryAccess:
                 app.check_repository_access(repository_fixture)
 
 
-class TestGetFilteredSnapshots:
-    """Tests for the function app.get_filtered_snapshots"""
+class TestGetSnapshots:
+    """Tests for the function app.get_snapshots"""
 
-    def test_some_snapshots(
-        self, repository_fixture, snapshot_list_fixture, snapshot_fixture, monkeypatch
-    ):
-        """if filter returns some snapshots a SnapshotList instance should be returned"""
-        monkeypatch.setattr(
-            repository_fixture,
-            "snapshots",
-            lambda *args, **kwargs: CompletedProcess(["./foo"], 0, None),
+    def test_standard_options(self, repository_fixture):
+        # mock CompletedProcess
+        mock_result = mock.Mock()
+        mock_result.stdout = "[]"
+        repository_fixture.snapshots = mock.MagicMock(return_value=mock_result)
+        # call function
+        app.get_snapshots(repository_fixture)
+        # check that function was called with expected options
+        repository_fixture.snapshots.assert_called_once_with(
+            json=True, group_by=None, snap_filter=None
         )
-        monkeypatch.setattr(
-            "restic_replica.snapshots.SnapshotList.from_json",
-            lambda *args, **kwargs: snapshot_list_fixture,
-        )
-        monkeypatch.setattr(
-            "restic_replica.snapshots.SnapshotList.filter",
-            lambda *args, **kwargs: [snapshot_fixture],
-        )
-        assert app.get_filtered_snapshots(repository_fixture, Policy(1)).snapshots == [
-            snapshot_fixture
-        ]
 
-    def test_no_snapshots(
-        self, repository_fixture, snapshot_list_fixture, snapshot_fixture, monkeypatch
-    ):
-        """if filter returns no snapshots a RuntimeError should be raised"""
-        monkeypatch.setattr(
-            repository_fixture,
-            "snapshots",
-            lambda *args, **kwargs: CompletedProcess(["./foo"], 0, None),
+    def test_group_by(self, repository_fixture):
+        test_group_by = SnapshotGroupByOptions()
+        # mock CompletedProcess
+        mock_result = mock.Mock()
+        mock_result.stdout = "[]"
+        repository_fixture.snapshots = mock.MagicMock(return_value=mock_result)
+        # call function
+        app.get_snapshots(repository_fixture, group_by=test_group_by)
+        # check that function was called with expected options
+        repository_fixture.snapshots.assert_called_once_with(
+            json=True, group_by=test_group_by, snap_filter=None
         )
-        monkeypatch.setattr(
-            "restic_replica.snapshots.SnapshotList.from_json",
-            lambda *args, **kwargs: snapshot_list_fixture,
+
+    def test_snap_filter(self, repository_fixture):
+        test_snap_filter = SnapshotFilterOptions()
+        # mock CompletedProcess
+        mock_result = mock.Mock()
+        mock_result.stdout = "[]"
+        repository_fixture.snapshots = mock.MagicMock(return_value=mock_result)
+        # call function
+        app.get_snapshots(repository_fixture, snap_filter=test_snap_filter)
+        # check that function was called with expected options
+        repository_fixture.snapshots.assert_called_once_with(
+            json=True, group_by=None, snap_filter=test_snap_filter
         )
-        monkeypatch.setattr(
-            "restic_replica.snapshots.SnapshotList.filter",
-            lambda *args, **kwargs: [],
-        )
-        with pytest.raises(RuntimeError):
-            app.get_filtered_snapshots(repository_fixture, Policy(1)).snapshots
+
+
+class TestApplyPolicy:
+    """Tests for the function app.apply_policy"""
+
+    @pytest.mark.usefixtures("snapshot_list_fixture")
+    def test_policy_applied_to_all_groups(self, snapshot_list_fixture):
+        """policy should be applied to all snapshot groups within a snapshot list"""
+        test_policy = Policy(1)  # keep only one snapshot
+        filtered_list = app.apply_policy(snapshot_list_fixture, test_policy)
+        # check all groups have only one snapshot
+        for group in filtered_list.snapshot_groups:
+            assert len(group.snapshots) == 1
+
+    @pytest.mark.usefixtures("snapshot_list_fixture")
+    def test_empty_group_not_returned(self, snapshot_list_fixture):
+        """
+        if a group has all snapshots filtered by a policy, it should not be present
+        in the returned snapshot list
+        """
+        # set a policy that will return nothing
+        test_policy = Policy(1)
+        # set "last" to zero after init, to avoid triggering "all zeroes not allowed" check
+        test_policy.last = 0
+        filtered_list = app.apply_policy(snapshot_list_fixture, test_policy)
+        # check no groups were returned
+        assert len(filtered_list.snapshot_groups) == 0
 
 
 class TestCopySnapshots:
@@ -411,9 +529,17 @@ class TestCopySnapshots:
         """function that returns all kwargs passed to it"""
         return kwargs
 
-    @pytest.mark.usefixtures("repository_fixture", "restic_cli_fixture")
-    def test_copy_success(self, repository_fixture, restic_cli_fixture):
+    @pytest.mark.usefixtures(
+        "snapshot_list_fixture", "repository_fixture", "restic_cli_fixture"
+    )
+    def test_copy_success(
+        self, snapshot_list_fixture, repository_fixture, restic_cli_fixture, monkeypatch
+    ):
         """Should return true if the copy operation is successful"""
+        monkeypatch.setattr(
+            "restic_replica.app.get_snapshots",
+            lambda *args, **kwargs: snapshot_list_fixture,
+        )
         with mock.patch.object(
             repository_fixture, "copy", return_value=CompletedProcess(["./foo"], 0)
         ):
@@ -430,9 +556,22 @@ class TestCopySnapshots:
                 CompletedProcess,
             )
 
-    @pytest.mark.usefixtures("repository_fixture", "restic_cli_fixture")
-    def test_copy_fail(self, repository_fixture, restic_cli_fixture, caplog):
+    @pytest.mark.usefixtures(
+        "snapshot_list_fixture", "repository_fixture", "restic_cli_fixture"
+    )
+    def test_copy_fail(
+        self,
+        snapshot_list_fixture,
+        repository_fixture,
+        restic_cli_fixture,
+        caplog,
+        monkeypatch,
+    ):
         """Should raise RuntimeError if the copy operation fails"""
+        monkeypatch.setattr(
+            "restic_replica.app.get_snapshots",
+            lambda *args, **kwargs: snapshot_list_fixture,
+        )
         with mock.patch.object(
             repository_fixture,
             "copy",
@@ -480,7 +619,9 @@ class TestCopySnapshots:
                 )
 
     @pytest.mark.usefixtures(
-        "repository_fixture", "restic_cli_fixture", "snapshot_list_fixture"
+        "repository_fixture",
+        "restic_cli_fixture",
+        "snapshot_list_fixture",
     )
     def test_snapshot_list(
         self, repository_fixture, restic_cli_fixture, snapshot_list_fixture
@@ -488,7 +629,7 @@ class TestCopySnapshots:
         """A SnapshotList object should be passed if a policy is provided"""
         with mock.patch.object(repository_fixture, "copy", self.return_kwargs):
             with mock.patch(
-                "restic_replica.app.get_filtered_snapshots",
+                "restic_replica.app.get_snapshots",
                 return_value=snapshot_list_fixture,
             ):
                 result = app.copy_snapshots(
@@ -499,13 +640,25 @@ class TestCopySnapshots:
                         password="secret2",
                     ),
                     repository_fixture,
-                    policy=Policy(1),
+                    policy=Policy(99999),
                 )
-                assert result["snapshots"] == snapshot_list_fixture
+                assert isinstance(result["snapshots"], SnapshotList)
 
-    @pytest.mark.usefixtures("repository_fixture", "restic_cli_fixture")
-    def test_no_snapshot_list(self, repository_fixture, restic_cli_fixture):
-        """A SnapshotList object should not be passed if a policy is not provided"""
+    @pytest.mark.usefixtures(
+        "snapshot_list_fixture", "repository_fixture", "restic_cli_fixture"
+    )
+    def test_no_snapshot_list(
+        self, snapshot_list_fixture, repository_fixture, restic_cli_fixture, monkeypatch
+    ):
+        """
+        if a policy is not provided;
+        - a SnapshotList object should not be passed
+        - a SnapshotFilterOptions object should be passed, if one is provided
+        """
+        monkeypatch.setattr(
+            "restic_replica.app.get_snapshots",
+            lambda *args, **kwargs: snapshot_list_fixture,
+        )
         with mock.patch.object(repository_fixture, "copy", self.return_kwargs):
             result = app.copy_snapshots(
                 Repository(
@@ -515,13 +668,25 @@ class TestCopySnapshots:
                     password="secret2",
                 ),
                 repository_fixture,
+                snap_filter=SnapshotFilterOptions(),
             )
-            assert result["snapshots"] is None
+            assert "snapshots" not in result
+            assert isinstance(result["snap_filter"], SnapshotFilterOptions)
 
-    @pytest.mark.usefixtures("repository_fixture", "restic_cli_fixture")
-    def test_dry_run(self, repository_fixture, restic_cli_fixture):
+    @pytest.mark.usefixtures(
+        "snapshot_list_fixture", "repository_fixture", "restic_cli_fixture"
+    )
+    def test_dry_run(
+        self, snapshot_list_fixture, repository_fixture, restic_cli_fixture, monkeypatch
+    ):
         """if the dry_run argument is passed, systemexit should be raised, and copy should not be called"""
+        monkeypatch.setattr(
+            "restic_replica.app.get_snapshots",
+            lambda *args, **kwargs: snapshot_list_fixture,
+        )
+        # raise RuntimeError if copy is called
         with mock.patch.object(repository_fixture, "copy", side_effect=RuntimeError):
+            # assert SystemExit is raised, not RuntimeError
             with pytest.raises(SystemExit):
                 app.copy_snapshots(
                     Repository(
@@ -533,3 +698,63 @@ class TestCopySnapshots:
                     repository_fixture,
                     dry_run=True,
                 )
+
+    @pytest.mark.usefixtures("repository_fixture", "restic_cli_fixture")
+    def test_empty_source_repository(
+        self, repository_fixture, restic_cli_fixture, monkeypatch
+    ):
+        """an empty source repository should raise a RuntimeError"""
+        monkeypatch.setattr(
+            "restic_replica.app.get_snapshots", lambda *args, **kwargs: SnapshotList([])
+        )
+        with pytest.raises(RuntimeError):
+            app.copy_snapshots(
+                Repository(
+                    "/tmp/restic-repo2",
+                    "myrepo2",
+                    restic_cli_fixture,
+                    password="secret2",
+                ),
+                repository_fixture,
+                dry_run=True,
+            )
+        # with snap_filter set
+        with pytest.raises(RuntimeError):
+            app.copy_snapshots(
+                Repository(
+                    "/tmp/restic-repo2",
+                    "myrepo2",
+                    restic_cli_fixture,
+                    password="secret2",
+                ),
+                repository_fixture,
+                snap_filter=SnapshotFilterOptions(),
+                dry_run=True,
+            )
+
+    @pytest.mark.usefixtures(
+        "snapshot_list_fixture", "repository_fixture", "restic_cli_fixture"
+    )
+    def test_empty_after_policy_applied(
+        self, snapshot_list_fixture, repository_fixture, restic_cli_fixture, monkeypatch
+    ):
+        """no snapshots remaining after policy is applied should raise a RuntimeError"""
+        monkeypatch.setattr(
+            "restic_replica.app.get_snapshots",
+            lambda *args, **kwargs: snapshot_list_fixture,
+        )
+        # set a policy that will return nothing
+        test_policy = Policy(1)
+        # set "last" to zero after init, to avoid triggering "all zeroes not allowed" check
+        test_policy.last = 0
+        with pytest.raises(RuntimeError):
+            app.copy_snapshots(
+                Repository(
+                    "/tmp/restic-repo2",
+                    "myrepo2",
+                    restic_cli_fixture,
+                    password="secret2",
+                ),
+                repository_fixture,
+                policy=test_policy,
+            )
