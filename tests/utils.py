@@ -16,8 +16,6 @@ def new_snapshot(timestamp: datetime):
         ["/etc/hosts"],
         "server.local",
         "user",
-        1000,
-        1000,
         "restic 0.16.4",
         id,
         short_id,

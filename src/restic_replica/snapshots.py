@@ -107,11 +107,11 @@ class Snapshot:
     paths: list[str]
     hostname: str
     username: str
-    uid: int
-    gid: int
     program_version: str
     id: str
     short_id: str
+    uid: Optional[int] = None  # not always present (e.g. backup ran as root)
+    gid: Optional[int] = None  # not always present (e.g. backup ran as root)
     parent: Optional[str] = None  # An initial snapshot will have no parents
     original: Optional[str] = None  # present if a snapshot was rewritten
     # present if excludes were passed at backup time
